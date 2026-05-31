@@ -390,30 +390,10 @@ export async function searchResources(
 
 /** Start a new interview session. */
 export async function startInterview(
-  mode: "dsa" | "resume",
-  resumeFile?: File,
+  mode: "dsa" | "system_design",
 ): Promise<any> {
-  const formData = new FormData();
-  formData.append("mode", mode);
-  if (resumeFile) {
-    formData.append("resume_file", resumeFile);
-  }
-
-  const token = getToken();
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const response = await fetch(`${BASE_URL}/interview/start`, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, await response.text());
-  }
-
-  const res = await response.json();
+  const body: StartInterviewRequest = { mode };
+  const res = await apiRequest<any>("POST", "/interview/start", body);
   if (!res) return null;
   return {
     ...res,
@@ -432,12 +412,6 @@ export async function sendInterviewMessage(
     `/interview/${session_id}/message`,
     { message },
   );
-}
-
-/** Get interview session history for the current user. */
-export async function getInterviewHistory(): Promise<any[]> {
-  const items = await apiRequest<any[]>("GET", "/interview/history");
-  return items || [];
 }
 
 // ---------------------------------------------------------------------------

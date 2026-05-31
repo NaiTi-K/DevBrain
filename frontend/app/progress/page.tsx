@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { getProgressDashboard, getInterviewHistory } from "@/lib/api";
+import { getProgressDashboard } from "@/lib/api";
 import type { ProgressDashboard } from "@/lib/types";
 
 const SkillRadarChart = dynamic(
@@ -118,7 +118,6 @@ const CustomTooltip = ({
 export default function ProgressPage() {
   const router = useRouter();
   const [dashboard, setDashboard] = useState<ProgressDashboard | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -126,10 +125,10 @@ export default function ProgressPage() {
       router.push("/");
       return;
     }
-    Promise.all([
-      getProgressDashboard().then(setDashboard).catch(() => setDashboard(null)),
-      getInterviewHistory().then(setHistory).catch(() => setHistory([]))
-    ]).finally(() => setLoading(false));
+    getProgressDashboard()
+      .then(setDashboard)
+      .catch(() => setDashboard(null))
+      .finally(() => setLoading(false));
   }, [router]);
 
   if (loading) {
@@ -389,29 +388,6 @@ export default function ProgressPage() {
                 />
               </LineChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* ── Interview History ── */}
-      {history.length > 0 && (
-        <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-6 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
-          <h2 className="text-white font-semibold mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#6366f1]" />
-            Recent Interviews
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {history.filter((h) => h.completed).map((h, i) => (
-              <div key={i} className="bg-[#0f1117] border border-[#2d3148] rounded-xl p-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[#6366f1] text-xs font-semibold uppercase tracking-widest">{h.mode === "dsa" ? "DSA" : "Resume"}</span>
-                  {h.overall_score !== null && (
-                    <span className="text-[#22c55e] text-sm font-bold">{Number(h.overall_score).toFixed(1)}/10</span>
-                  )}
-                </div>
-                <p className="text-gray-400 text-xs">{new Date(h.created_at).toLocaleDateString()}</p>
-              </div>
-            ))}
           </div>
         </div>
       )}
