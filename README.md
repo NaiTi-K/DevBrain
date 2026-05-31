@@ -95,7 +95,9 @@ Want to run DevBrain locally? It's incredibly easy to spin up.
 - Docker & Docker Compose
 - API Keys: xAI (Grok), GitHub OAuth, Tavily
 
-### Installation
+### Installation (Local Hybrid Workflow)
+
+The recommended way to run DevBrain locally is a **hybrid workflow**: run the databases via Docker, but run the Backend and Frontend natively for instant hot-reloading and easier debugging.
 
 1. **Clone & Configure**
    ```bash
@@ -107,18 +109,42 @@ Want to run DevBrain locally? It's incredibly easy to spin up.
    # Edit .env with your API keys
    ```
 
-2. **Spin up the Infrastructure**
+2. **Spin up Postgres & Redis**
    ```bash
-   # Starts Postgres, Redis, the FastAPI backend, and the Next.js frontend
-   docker compose up -d
+   # Run only the database services in the background
+   docker compose up -d postgres redis
    ```
 
-3. **Run Database Migrations**
+3. **Start the FastAPI Backend**
+   Open a new terminal in the `backend/` directory:
    ```bash
-   docker compose exec backend alembic upgrade head
+   cd backend
+   
+   # Windows
+   venv\Scripts\activate
+   # Mac/Linux
+   # source venv/bin/activate
+   
+   # Install dependencies if you haven't yet
+   pip install -r requirements.txt
+   
+   # Run the server
+   uvicorn main:app --reload --port 8000
    ```
 
-4. **Access the App**
+4. **Start the Next.js Frontend**
+   Open a third terminal in the `frontend/` directory:
+   ```bash
+   cd frontend
+   
+   # Install dependencies
+   npm install
+   
+   # Start the dev server
+   npm run dev
+   ```
+
+5. **Access the App**
    - 🌐 App: `http://localhost:3000`
    - 📖 API Docs: `http://localhost:8000/docs`
 
