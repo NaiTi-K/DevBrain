@@ -35,8 +35,8 @@ router = APIRouter(tags=["interview"])
 
 
 class StartInterviewRequest(BaseModel):
-    mode: Literal["dsa", "system_design"] = Field(
-        ..., description="Interview mode: 'dsa' for coding problems, 'system_design' for architecture."
+    mode: Literal["dsa", "resume"] = Field(
+        ..., description="Interview mode: 'dsa' for coding problems, 'resume' for personalized project-based interview."
     )
 
 
@@ -151,6 +151,10 @@ async def _get_session_or_404(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+from fastapi import APIRouter, Depends, HTTPException, Path, status, Form, UploadFile, File
+import io
+import PyPDF2
+
 @router.post(
     "/start",
     response_model=StartInterviewResponse,
@@ -158,15 +162,36 @@ async def _get_session_or_404(
     summary="Start a new interview session and receive the first question",
 )
 async def start_interview(
-    body: StartInterviewRequest,
+    mode: Literal["dsa", "resume"] = Form(..., description="Interview mode: 'dsa' for coding problems, 'resume' for personalized project-based interview."),
+    resume_file: UploadFile | None = File(None, description="Optional PDF resume for 'resume' mode."),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StartInterviewResponse:
     """
-    Creates a new InterviewSession in PostgreSQL, runs interview_agent_node
+    Creates a new InterviewSession in PostgreSQL, parses the resume if provided, runs interview_agent_node
     with an empty history to generate the first question, then persists
     the updated state.
     """
+    # Parse PDF if mode is resume and file is provided
+    if mode == "resume" and resume_file:
+        if resume_file.content_type != "application/pdf":
+            raise HTTPException(status_code=400, detail="Resume must be a PDF file.")
+        
+        content = await resume_file.read()
+        try:
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+            extracted_text = ""
+            for page in pdf_reader.pages:
+                text = page.extract_text()
+                if text:
+                    extracted_text += text + "\n"
+            if extracted_text.strip():
+                current_user.resume_text = extracted_text.strip()
+                await db.commit()
+        except Exception as exc:
+            logger.error(f"Failed to process PDF resume: {exc}")
+            raise HTTPException(status_code=500, detail="Failed to extract text from PDF.")
+    
     session_id = str(uuid.uuid4())
     skill_profile = _extract_skill_profile(current_user)
 
@@ -174,7 +199,7 @@ async def start_interview(
         user=current_user,
         user_input="",
         structured_output={
-            "mode": body.mode,
+            "mode": mode,
             "skill_profile": skill_profile,
             "used_topics": [],
             "current_question": {},
@@ -207,7 +232,7 @@ async def start_interview(
         db_session = InterviewSession(
             id=session_id,
             user_id=str(current_user.id),
-            mode=body.mode,
+            mode=mode,
             conversation_history=updated_history,
             structured_output=updated_structured,
             overall_score=None,
@@ -229,7 +254,7 @@ async def start_interview(
     return StartInterviewResponse(
         session_id=session_id,
         first_question=first_question,
-        mode=body.mode,
+        mode=mode,
     )
 
 
@@ -301,10 +326,13 @@ async def send_message(
     if session_complete and final_report:
         overall_score = float(final_report.get("overall_score", 0.0))
 
+    from sqlalchemy.orm.attributes import flag_modified
     # Persist updated session
     try:
         db_session.conversation_history = updated_history
         db_session.structured_output = updated_structured
+        flag_modified(db_session, "messages")
+        flag_modified(db_session, "topics_covered")
         db_session.completed = session_complete
         db_session.overall_score = overall_score
         db_session.updated_at = datetime.utcnow()

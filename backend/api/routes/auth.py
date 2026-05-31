@@ -167,3 +167,6 @@ async def oauth_callback(
 async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
     """Return the authenticated user."""
     return UserResponse.from_user(current_user)
+
+
+

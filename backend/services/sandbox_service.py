@@ -409,7 +409,39 @@ def compare_outputs(actual: str, expected_val, judge: str) -> bool:
     return actual_parsed == expected_parsed
 
 
+def _infer_type(val) -> str:
+    if isinstance(val, int): return "int"
+    if isinstance(val, float): return "float"
+    if isinstance(val, bool): return "bool"
+    if isinstance(val, str): return "string"
+    if isinstance(val, list):
+        if not val: return "int[]"
+        if isinstance(val[0], list):
+            if not val[0]: return "int[][]"
+            if isinstance(val[0][0], str): return "string[][]"
+            return "int[][]"
+        if isinstance(val[0], str): return "string[]"
+        return "int[]"
+    return "string"
+
+def _ensure_params(schema: dict, test_cases: list) -> list:
+    params = schema.get("params", [])
+    if params:
+        return params
+    if not test_cases:
+        return []
+    
+    first_input = test_cases[0].get("input")
+    if isinstance(first_input, dict):
+        return [{"name": k, "type": _infer_type(v)} for k, v in first_input.items()]
+    else:
+        # Wrap the input into a dict for all test cases so the downstream code works!
+        for tc in test_cases:
+            tc["input"] = {"arg0": tc.get("input")}
+        return [{"name": "arg0", "type": _infer_type(first_input)}]
+
 def run_code(language: str, user_code: str, schema: dict, test_cases: list, judge: str) -> dict:
+    schema["params"] = _ensure_params(schema, test_cases)
     try:
         if language in ["cpp", "c++", "c"]:
             source = build_cpp_main(schema, test_cases, user_code)
