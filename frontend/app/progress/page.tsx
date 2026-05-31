@@ -153,15 +153,18 @@ export default function ProgressPage() {
     );
   }
 
-  const streak = dashboard.streak ?? 0;
-  const passRate = Math.round((dashboard.challenge_pass_rate ?? 0) * 100);
-  const reviewCount = dashboard.reviews_done ?? 0;
-  const skills = dashboard.skills ?? {};
-  const deltas = dashboard.skill_delta_7d ?? {};
-  const examReadiness = dashboard.exam_readiness ?? {};
-  const weeklyDigest = dashboard.weekly_digest ?? "";
-  const activityData = dashboard.activity_heatmap ?? {};
-  const trendData = dashboard.skill_trend_30d ?? [];
+  const streak = dashboard.streak?.current_streak ?? 0;
+  const passRate = Math.round(((dashboard.total_challenges_solved / Math.max(1, dashboard.total_challenges_solved + dashboard.total_reviews_submitted)) * 100) || 0);
+  const reviewCount = dashboard.total_reviews_submitted ?? 0;
+  const skills = dashboard.skill_profile?.skills ?? {};
+  const deltas = dashboard.skill_deltas?.reduce((acc, curr) => {
+    acc[curr.skill] = curr.delta_7d;
+    return acc;
+  }, {} as Record<string, number>) ?? {};
+  const examReadiness = dashboard.exam_readiness_score ? { "Overall Readiness": Math.round(dashboard.exam_readiness_score * 100) } : {};
+  const weeklyDigest = dashboard.focus_recommendations?.join(" ") ?? "";
+  const activityData = dashboard.daily_activity ?? [];
+  const trendData: any[] = [];
 
   const formattedTrend = trendData.map(
     (pt: { date: string; score: number }) => ({
@@ -204,8 +207,8 @@ export default function ProgressPage() {
         {/* Challenge pass rate */}
         <CircularProgress
           pct={passRate}
-          label="Challenge Pass Rate"
-          sub={`${dashboard.challenges_attempted ?? 0} attempted`}
+          label="Challenges Solved"
+          sub={`${dashboard.total_challenges_solved ?? 0} total solved`}
         />
 
         {/* Reviews done */}
@@ -347,7 +350,7 @@ export default function ProgressPage() {
             <span className="w-2 h-2 rounded-full bg-[#f59e0b]" />
             30-Day Activity
           </h2>
-          <ProgressHeatmap activityData={activityData} />
+          <ProgressHeatmap data={activityData} />
         </div>
       )}
 

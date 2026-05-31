@@ -10,18 +10,17 @@ GET  /github/profile  — return the latest cached/persisted skill profile
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import desc, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from agents.github_analyzer import SkillProfileResponse, github_analyzer_node
-from agents.orchestrator import DevBrainState, app as graph_app
+from agents.orchestrator import DevBrainState
 from core.dependencies import get_current_user, get_db
 from models.skill_profile import SkillProfile
 from models.user import User

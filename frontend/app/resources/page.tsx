@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { searchResources } from "@/lib/api";
 import type { Resource } from "@/lib/types";
@@ -119,7 +119,7 @@ function ResourceCardSkeleton() {
   );
 }
 
-export default function ResourcesPage() {
+function ResourcesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
@@ -147,7 +147,7 @@ export default function ResourcesPage() {
     setLoading(true);
     setSearched(true);
     try {
-      const result = await searchResources(t, d || undefined);
+      const result = await searchResources(t, (d || undefined) as any);
       if (Array.isArray(result)) {
         setResources(result);
       } else {
@@ -285,5 +285,13 @@ export default function ResourcesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResourcesPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="w-10 h-10 border-2 border-[#6366f1] border-t-transparent rounded-full animate-spin" /></div>}>
+      <ResourcesPageContent />
+    </Suspense>
   );
 }

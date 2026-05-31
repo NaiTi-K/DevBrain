@@ -8,14 +8,12 @@ submitted solutions.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
-import textwrap
 import uuid
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional
 
 from models.database import async_session
 from models.challenge import Challenge
@@ -24,28 +22,62 @@ from services.llm_service import llm
 
 logger = logging.getLogger(__name__)
 
+# ── Validation ─────────────────────────────────────────────────────────────
+VALID_TYPES = {
+    "int", "long", "float", "double", "bool", "string", "char",
+    "int[]", "long[]", "float[]", "double[]", "bool[]", "string[]", "char[]",
+    "int[][]", "string[][]", "List<int>", "List<string>", "List<List<int>>"
+}
+
+VALID_JUDGES = {"exact", "any_order"}
+
+def validate_schema(schema: dict) -> None:
+    """Raises ValueError with a descriptive message if schema is invalid."""
+    if not schema:
+        raise ValueError("Missing 'schema' object in challenge.")
+
+    params = schema.get("params", [])
+    if not isinstance(params, list) or len(params) == 0:
+        raise ValueError("schema.params must be a non-empty list.")
+
+    for p in params:
+        if p.get("type") not in VALID_TYPES:
+            raise ValueError(
+                f"Unsupported type '{p.get('type')}' in schema.params. "
+                f"Must be one of: {VALID_TYPES}"
+            )
+
+    ret = schema.get("returns")
+    if ret not in VALID_TYPES:
+        raise ValueError(f"Unsupported return type '{ret}'.")
+
+    judge = schema.get("judge", "exact")
+    if judge not in VALID_JUDGES and not judge.startswith("epsilon:"):
+        raise ValueError(
+            f"Invalid judge '{judge}'. Must be 'exact', 'any_order', or 'epsilon:<tol>'."
+        )
+
 # ── Skill → coding topic mapping ──────────────────────────────────────────
 _SKILL_TO_TOPIC: dict[str, str] = {
-    "Python": "data structures",
-    "JavaScript": "asynchronous programming",
-    "TypeScript": "type-safe patterns",
-    "Java": "object-oriented design",
-    "C++": "memory management and algorithms",
-    "C": "pointers and recursion",
-    "Go": "concurrency and goroutines",
-    "Rust": "ownership and lifetimes",
-    "SQL": "query optimisation",
-    "Shell": "shell scripting",
-    "HTML": "DOM manipulation",
-    "CSS": "layout and specificity",
-    "Ruby": "metaprogramming",
-    "PHP": "web security patterns",
-    "Swift": "optionals and closures",
-    "Kotlin": "coroutines",
-    "R": "statistical computation",
-    "Scala": "functional programming",
-    "Haskell": "pure functional patterns",
-    "MATLAB": "numerical computing",
+    "Python": "data structures and algorithms",
+    "JavaScript": "hash maps and arrays",
+    "TypeScript": "two pointers and sliding window",
+    "Java": "object-oriented design (e.g. LRU Cache)",
+    "C++": "pointers and linked lists",
+    "C": "bit manipulation and math",
+    "Go": "trees and graphs",
+    "Rust": "dynamic programming",
+    "SQL": "binary search",
+    "HTML": "stacks and queues",
+    "CSS": "greedy algorithms",
+    "Ruby": "sorting and searching",
+    "PHP": "string manipulation",
+    "Swift": "intervals and matrices",
+    "Kotlin": "backtracking",
+    "R": "tries and advanced structures",
+    "Scala": "heaps and priority queues",
+    "Haskell": "divide and conquer",
+    "MATLAB": "math and geometry",
 }
 
 _DEFAULT_TOPIC = "algorithms and problem solving"
@@ -59,20 +91,11 @@ _DEFAULT_TOPIC = "algorithms and problem solving"
 async def challenge_agent_node(state: dict) -> dict:
     """
     LangGraph node: generate an adaptive coding challenge.
-
-    Steps
-    -----
-    1. Resolve skill profile; find the weakest skill.
-    2. Map that skill to a coding topic.
-    3. Determine difficulty from the skill score.
-    4. Prompt Grok for a complete challenge JSON.
-    5. Save Challenge to DB.
-    6. Populate state fields.
     """
     user_id: str = state["user_id"]
 
     try:
-        # ── 1. Resolve skill profile ───────────────────────────────────────
+        # 1. Resolve skill profile
         skill_profile: dict = state.get("skill_profile") or {}
         skills: dict[str, float] = skill_profile.get("skills", {})
 
@@ -81,37 +104,86 @@ async def challenge_agent_node(state: dict) -> dict:
             if cached:
                 skills = cached.get("skills", {})
 
-        # ── 2. Find weakest skill that maps to a coding topic ──────────────
-        weak_skill, weak_score = _find_weakest_coding_skill(skills)
+        last_topic = _TOPIC_MEMORY.get(user_id, "")
+        weak_skill, weak_score = _find_weakest_coding_skill(skills, last_topic)
         topic: str = _SKILL_TO_TOPIC.get(weak_skill, _DEFAULT_TOPIC)
         difficulty: str = _difficulty_from_score(weak_score)
+        primary_lang: str = weak_skill if weak_skill in ["Python", "JavaScript", "C++"] else "Python"
 
-        # Primary language = highest-scoring skill (for starter code)
-        primary_lang: str = (
-            max(skills.items(), key=lambda x: x[1])[0] if skills else "Python"
-        )
+        from services.search_service import search_service
+        search_query = f"leetcode exact problem description constraints test cases {topic} {difficulty}"
+        search_results = await search_service.search(search_query, max_results=3, search_depth="advanced")
+        
+        search_context = ""
+        if search_results:
+            search_context = "\n\n".join(
+                f"Source: {res['url']}\nContent: {res['content']}"
+                for res in search_results
+            )
 
-        # ── 3. Build prompt ────────────────────────────────────────────────
-        prompt = _build_challenge_prompt(
-            topic=topic,
-            difficulty=difficulty,
-            language=primary_lang,
-            skill=weak_skill,
-        )
+        prompt = _build_challenge_prompt(topic=topic, difficulty=difficulty, language=primary_lang, skill=weak_skill, search_context=search_context)
 
-        # ── 4. Call LLM ────────────────────────────────────────────────────
-        raw: str = await llm.structured_call(prompt)
-        challenge_dict: Optional[dict] = _parse_json_safe(raw)
+        challenge_dict = None
+        for attempt in range(4):
+            temp = 0.8 + (attempt * 0.05)
+            raw: str = await llm.structured_call(prompt, temperature=temp)
+            parsed: Optional[dict] = _parse_json_safe(raw)
+            if not parsed or "title" not in parsed:
+                continue
+            
+            try:
+                validate_schema(parsed.get("schema", {}))
+            except ValueError as e:
+                # Retry once with correction
+                correction_prompt = f"Your previous schema was invalid: {e}. Fix it and return the full JSON again."
+                try:
+                    raw2 = await llm.structured_call(correction_prompt, temperature=0.6)
+                    parsed = _parse_json_safe(raw2)
+                    if parsed: validate_schema(parsed.get("schema", {}))
+                except Exception:
+                    continue
+            
+            # Verify solution against test cases
+            solution_code = parsed.get("solution", "").replace("\\n", "\n")
+            starter_code = parsed.get("starter_code", "").replace("\\n", "\n")
+            test_cases = parsed.get("test_cases", [])
+            
+            if not solution_code or not test_cases:
+                continue
+                
+            from services.sandbox_service import run_code
+            import asyncio
+            
+            schema = parsed.get("schema", {})
+            eval_result = await asyncio.to_thread(
+                run_code, "python", solution_code, schema, test_cases, schema.get("judge", "exact")
+            )
+            
+            if eval_result.get("status") != "AC":
+                err_msg = eval_result.get("stderr") or "Some test cases failed."
+                correction_prompt = f"Your generated solution failed against your own test cases! Fix the test cases or the solution. Error: {err_msg}"
+                try:
+                    raw3 = await llm.structured_call(correction_prompt, temperature=0.6)
+                    parsed3 = _parse_json_safe(raw3)
+                    if parsed3 and "solution" in parsed3:
+                        parsed = parsed3
+                except Exception:
+                    pass
+                continue
+                
+            challenge_dict = parsed
+            break
 
-        if not challenge_dict or "title" not in challenge_dict:
-            raw_str = json.dumps(raw) if isinstance(raw, dict) else str(raw)
-            raise ValueError(f"LLM returned unparseable challenge JSON:\n{raw_str[:300]}")
+        if not challenge_dict and parsed:
+            logger.error("Failed to generate a passing challenge after 4 attempts. Falling back to the last generated challenge.")
+            challenge_dict = parsed
+        elif not challenge_dict:
+            raise ValueError("Failed to generate a challenge after 4 attempts.")
 
-        # Enforce required fields
         challenge_dict.setdefault("difficulty", difficulty)
         challenge_dict.setdefault("topic", topic)
+        challenge_dict.setdefault("language", primary_lang)
 
-        # ── 5. Persist to DB ───────────────────────────────────────────────
         async with async_session() as session:
             challenge = Challenge(
                 id=uuid.uuid4(),
@@ -122,9 +194,12 @@ async def challenge_agent_node(state: dict) -> dict:
                 topic=challenge_dict.get("topic", topic),
                 constraints=challenge_dict.get("constraints", []),
                 examples=challenge_dict.get("examples", []),
+                mcqs=challenge_dict.get("mcqs", []),
                 test_cases=challenge_dict.get("test_cases", []),
-                starter_code=challenge_dict.get("starter_code", ""),
-                solution=challenge_dict.get("solution", ""),
+                starter_codes=challenge_dict.get("starter_codes", {}),
+                solution=challenge_dict.get("solution", "").replace("\\n", "\n"),
+                schema=challenge_dict.get("schema", {}),
+                judge=challenge_dict.get("schema", {}).get("judge", "exact"),
                 created_at=datetime.utcnow(),
             )
             session.add(challenge)
@@ -132,9 +207,8 @@ async def challenge_agent_node(state: dict) -> dict:
             await session.refresh(challenge)
 
         challenge_dict["id"] = str(challenge.id)
-
-        # ── 6. Format human-readable output ───────────────────────────────
         agent_output = _format_challenge_display(challenge_dict)
+        _TOPIC_MEMORY[user_id] = topic
 
         return {
             **state,
@@ -153,145 +227,7 @@ async def challenge_agent_node(state: dict) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════ #
-# Submission evaluator (sandboxed)                                            #
-# ═══════════════════════════════════════════════════════════════════════════ #
 
-
-async def evaluate_submission(
-    challenge_or_code: Any = None,
-    user_code: Optional[str] = None,
-    test_cases: Optional[list[dict]] = None,
-    timeout_seconds: float = 5.0,
-) -> dict:
-    """
-    Execute user_code in a sandboxed subprocess and run every test case.
-
-    Each test case is injected as a harness appended to the user's code.
-    A wall-clock timeout is enforced per test.
-
-    Returns
-    -------
-    {
-        "tests_passed": int,
-        "tests_total": int,
-        "passed": bool,
-        "output": str,
-        "error": str | None,
-    }
-    """
-    import sys
-
-    if isinstance(challenge_or_code, str):
-        actual_code = challenge_or_code
-        actual_test_cases = test_cases or []
-    elif challenge_or_code is None:
-        actual_code = user_code or ""
-        actual_test_cases = test_cases or []
-    else:
-        actual_code = user_code or ""
-        actual_test_cases = challenge_or_code.test_cases or []
-
-    if not actual_test_cases:
-        return {
-            "tests_passed": 0,
-            "tests_total": 0,
-            "passed": False,
-            "output": "",
-            "error": "No test cases defined for this challenge.",
-        }
-
-    tests_passed = 0
-    all_output_lines: list[str] = []
-    first_error: Optional[str] = None
-
-    for idx, tc in enumerate(actual_test_cases, start=1):
-        tc_input: str = str(tc.get("input", ""))
-        expected: str = str(tc.get("expected", "")).strip()
-
-        # Build a self-contained script: user code + a minimal test harness
-        harness = textwrap.dedent(f"""
-            # ── AUTO-GENERATED TEST HARNESS ──
-            import sys, io
-
-            _captured = io.StringIO()
-            sys.stdout = _captured
-            try:
-                _tc_input_str = {tc_input!r}
-                if 'solution(' in _tc_input_str:
-                    _result = eval(_tc_input_str)
-                elif 'def solution' in {actual_code!r} or 'solution' in globals() or 'solution' in locals():
-                    try:
-                        _args = eval(_tc_input_str)
-                        if isinstance(_args, tuple):
-                            _result = solution(*_args)
-                        else:
-                            _result = solution(_args)
-                    except Exception:
-                        _result = solution(_tc_input_str)
-                else:
-                    _result = eval(_tc_input_str)
-
-                if _result is not None:
-                    print(_result)
-            except Exception as _exc:
-                sys.stdout = sys.__stdout__
-                print(f"ERROR: {{_exc}}")
-                sys.exit(1)
-            sys.stdout = sys.__stdout__
-            _actual = _captured.getvalue().strip()
-            print(_actual)
-        """)
-
-        full_script = actual_code + "\n" + harness
-
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-c",
-                full_script,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            try:
-                stdout_b, stderr_b = await asyncio.wait_for(
-                    proc.communicate(), timeout=timeout_seconds
-                )
-            except asyncio.TimeoutError:
-                proc.kill()
-                all_output_lines.append(f"Test {idx}: ❌ TIMEOUT (> 5 s)")
-                first_error = first_error or "Time limit exceeded (timeout)."
-                continue
-
-            stdout_str = stdout_b.decode(errors="replace").strip()
-            stderr_str = stderr_b.decode(errors="replace").strip()
-
-            if stderr_str and not stdout_str:
-                all_output_lines.append(f"Test {idx}: ❌ RUNTIME ERROR — {stderr_str[:200]}")
-                first_error = first_error or stderr_str
-                continue
-
-            actual = stdout_str.splitlines()[-1] if stdout_str else ""
-
-            if actual == expected:
-                tests_passed += 1
-                all_output_lines.append(f"Test {idx}: ✅ PASSED")
-            else:
-                all_output_lines.append(
-                    f"Test {idx}: ❌ FAILED — expected {expected!r}, got {actual!r}"
-                )
-
-        except Exception as exc:  # noqa: BLE001
-            all_output_lines.append(f"Test {idx}: ❌ ERROR — {exc}")
-            first_error = first_error or str(exc)
-
-    total = len(actual_test_cases)
-    return {
-        "tests_passed": tests_passed,
-        "tests_total": total,
-        "passed": tests_passed == total,
-        "output": "\n".join(all_output_lines),
-        "error": first_error,
-    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════ #
@@ -299,59 +235,85 @@ async def evaluate_submission(
 # ═══════════════════════════════════════════════════════════════════════════ #
 
 
-def _find_weakest_coding_skill(skills: dict[str, float]) -> tuple[str, float]:
-    """Return (skill_name, score) for the weakest skill in _SKILL_TO_TOPIC."""
-    coding_skills = {k: v for k, v in skills.items() if k in _SKILL_TO_TOPIC}
+_TOPIC_MEMORY: dict[str, str] = {}  # user_id -> last_topic
+
+def _find_weakest_coding_skill(skills: dict[str, float], last_topic: str = "") -> tuple[str, float]:
+    """Return (skill_name, score) for the weakest skill, avoiding last_topic if possible."""
+    coding_skills = {k: v for k, v in skills.items() if k in _SKILL_TO_TOPIC and _SKILL_TO_TOPIC[k] != last_topic}
+    if not coding_skills:
+        # Fallback if all skills are the last topic (unlikely but possible)
+        coding_skills = {k: v for k, v in skills.items() if k in _SKILL_TO_TOPIC}
     if not coding_skills:
         return "Python", 0.0
     skill = min(coding_skills, key=coding_skills.get)  # type: ignore[arg-type]
     return skill, coding_skills[skill]
 
-
 def _difficulty_from_score(score: float) -> str:
-    if score < 0.30:
-        return "easy"
-    elif score <= 0.65:
+    if score <= 0.40:
         return "medium"
     return "hard"
 
 
-def _build_challenge_prompt(topic: str, difficulty: str, language: str, skill: str) -> str:
-    return f"""You are a senior competitive programming coach creating interview-style coding challenges.
 
+def _build_challenge_prompt(topic: str, difficulty: str, language: str, skill: str, search_context: str) -> str:
+    context_block = f"\n=== INTERNET SEARCH CONTEXT ===\n{search_context}\n================================\n" if search_context else ""
+
+    return f"""You are a senior competitive programming coach creating coding challenges.
+{context_block}
 Target skill: {skill}
 Topic area  : {topic}
 Difficulty  : {difficulty}
-Starter code language: {language}
 
-Generate ONE coding challenge as a single JSON object (NO markdown fences, NO extra text):
+Generate ONE coding challenge as a single JSON object.
+CRITICAL INSTRUCTION: Do NOT invent a new problem. You MUST base this on a real, published competitive programming problem (e.g. from LeetCode or GeeksforGeeks) matching the topic.
+Use the Internet Search Context above to extract a real problem statement, its mathematical constraints, and its proven test cases.
+Make sure to pick a UNIQUE and INTERESTING problem. Do NOT repeatedly generate basic problems like "Two Sum" or "Find Duplicate in Array" unless specifically requested. Provide a different classic problem each time!
+
 {{
-  "title": "Short descriptive title",
-  "description": "Full problem statement with context. Be clear and unambiguous.",
+  "title": "Exact Title of the Real Problem",
+  "description": "Full problem statement exactly as published.",
   "difficulty": "{difficulty}",
   "topic": "{topic}",
-  "constraints": ["constraint 1", "constraint 2"],
+  "constraints": ["constraint 1"],
   "examples": [
-    {{
-      "input": "example input",
-      "output": "example output",
-      "explanation": "why this output"
-    }}
+    {{"input": "example input", "output": "example output", "explanation": "why"}}
   ],
   "test_cases": [
-    {{"input": "test input 1", "expected": "expected output 1"}},
-    {{"input": "test input 2", "expected": "expected output 2"}},
-    {{"input": "test input 3", "expected": "expected output 3"}}
+    {{"input": {{"arr": [1, 2], "target": 3}}, "expected": "[1, 2]", "type": "empty_input"}},
+    {{"input": {{"arr": [], "target": 0}}, "expected": "[]", "type": "single_element"}}
   ],
-  "starter_code": "# {language} starter\\ndef solution(...):\\n    pass",
-  "solution": "# Complete reference solution\\ndef solution(...):\\n    ..."
+  "schema": {{
+    "params": [
+      {{"name": "arr", "type": "int[]"}},
+      {{"name": "target", "type": "int"}}
+    ],
+    "returns": "int[]",
+    "judge": "exact"
+  }},
+  "mcqs": [
+    {{"question": "System Design: Which DB is best for a highly connected social graph?", "options": ["PostgreSQL", "Neo4j", "Redis", "MongoDB"], "correct_index": 1, "explanation": "Neo4j is a graph database..."}},
+    {{"question": "DBMS: What is a covering index?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct_index": 0, "explanation": "..."}},
+    {{"question": "OOP: What is the primary purpose of the Factory pattern?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct_index": 0, "explanation": "..."}}
+  ],
+  "starter_codes": {{
+    "python": "def solution(...):\n    pass",
+    "cpp": "#include <iostream>\n#include <vector>\nusing namespace std;\n\nvector<int> solution(...) {{\n    return {{}};\n}}",
+    "java": "import java.util.*;\n\nclass Solution {{\n    public static int[] solution(...) {{\n        return new int[]{{}};\n    }}\n}}"
+  }},
+  "solution": "# Complete reference solution in Python\\ndef solution(...):\n    ..."
 }}
 
 Rules:
-- Exactly 3 test cases minimum.
-- starter_code and solution must be syntactically valid {language}.
-- difficulty must be {difficulty} level for a developer with score {difficulty}.
-- description must be self-contained (no external links needed).
+- Exactly 6 test cases. Ensure inputs contain diverse edge cases (e.g. empty, negative, max size).
+- The 'schema' object MUST define 'params' (list of dicts with 'name' and 'type'), 'returns' (type), and 'judge' ("exact" or "any_order").
+- Valid types: int, long, float, double, bool, string, char, int[], long[], float[], double[], bool[], string[], char[], int[][], string[][].
+- Test case 'input' MUST be a dictionary mapping each parameter name to its JSON value (e.g. {{"arr": [1, 2, 3], "target": 5}}). DO NOT use a single string for input.
+- Test case 'expected' MUST be a JSON string of the exact output (e.g. "5", "[1, 2]", "true", "\\"hello\\"").
+- The function name MUST be exactly 'solution' in all languages. For Java, it MUST be a static method inside a class named 'Solution'.
+- The 'starter_codes' MUST ONLY contain the function signature and 'pass'/'return'. DO NOT include the implementation. Provide starter code for Python, C++, and Java using the exact types from your schema.
+- Exactly 3 MCQs covering System Design, DBMS, and OOP concepts. Provide exactly 4 options and detailed explanations.
+- The solution must be syntactically valid Python.
+- The solution MUST pass all 6 test cases.
 """
 
 

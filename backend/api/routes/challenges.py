@@ -12,14 +12,17 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from agents.challenge_agent import challenge_agent_node, evaluate_submission
+from agents.challenge_agent import challenge_agent_node
+from services.sandbox_service import run_code
+import asyncio
+import json
 from core.dependencies import get_current_user, get_db
 from models.challenge import Challenge, ChallengeAttempt
 from models.user import User
@@ -38,10 +41,12 @@ class ChallengeResponse(BaseModel):
     title: str
     description: str
     difficulty: str
+    language: str
     topic: str
-    constraints: list[str]
-    examples: list[dict]
-    starter_code: str
+    constraints: list[str] = []
+    examples: list[dict] = []
+    mcqs: list[dict] = []
+    starter_codes: dict[str, str] = {}
     # Note: solution is intentionally omitted from the response
 
     class Config:
@@ -50,6 +55,8 @@ class ChallengeResponse(BaseModel):
 
 class SubmitRequest(BaseModel):
     code: str
+    mcq_answers: list[int] = []
+    language: str = "python"
 
 
 class AttemptResult(BaseModel):
@@ -57,6 +64,7 @@ class AttemptResult(BaseModel):
     challenge_id: str
     tests_passed: int
     tests_total: int
+    mcqs_passed: int = 0
     passed: bool
     output: str
     error: Optional[str]
@@ -71,9 +79,11 @@ class AttemptHistoryItem(BaseModel):
     challenge_title: str
     challenge_topic: str
     difficulty: str
+    language: str
     passed: bool
     tests_passed: int
     tests_total: int
+    mcqs_passed: int = 0
     submitted_at: datetime
 
 
@@ -98,7 +108,7 @@ async def generate_challenge(
     """
     user_id = str(current_user.id)
 
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     result = await db.execute(
         select(Challenge).where(
             Challenge.user_id == current_user.id,
@@ -113,9 +123,11 @@ async def generate_challenge(
             description=existing_challenge.description,
             difficulty=existing_challenge.difficulty,
             topic=existing_challenge.topic,
+            language=existing_challenge.language,
             constraints=existing_challenge.constraints or [],
             examples=existing_challenge.examples or [],
-            starter_code=existing_challenge.starter_code,
+            mcqs=existing_challenge.mcqs or [],
+            starter_codes=existing_challenge.starter_codes or {},
         )
 
     skill_profile: dict = {}
@@ -172,9 +184,11 @@ async def generate_challenge(
         description=challenge.description,
         difficulty=challenge.difficulty,
         topic=challenge.topic,
+        language=challenge.language,
         constraints=challenge.constraints or [],
         examples=challenge.examples or [],
-        starter_code=challenge.starter_code,
+        mcqs=challenge.mcqs or [],
+        starter_codes=challenge.starter_codes or {},
     )
 
 
@@ -220,7 +234,20 @@ async def submit_challenge(
                             detail="Challenge not found.")
 
     # ── Run sandboxed evaluation ──────────────────────────────────────────
-    eval_result = await evaluate_submission(challenge, body.code)
+    # Note: If challenge.schema is missing on old challenges, fallback to default schema
+    schema = challenge.schema or {"params": [], "returns": "int"}
+    eval_result = await asyncio.to_thread(run_code, body.language, body.code, schema, challenge.test_cases, challenge.judge)
+    
+    tests_total = len(eval_result["test_results"])
+    tests_passed = sum(1 for tr in eval_result["test_results"] if tr["status"] == "AC")
+    passed = eval_result["status"] == "AC"
+
+    # ── Evaluate MCQs ─────────────────────────────────────────────────────
+    mcqs_passed = 0
+    if challenge.mcqs and body.mcq_answers:
+        for i, mcq in enumerate(challenge.mcqs):
+            if i < len(body.mcq_answers) and body.mcq_answers[i] == mcq.get("correct_index", -1):
+                mcqs_passed += 1
 
     # ── Save attempt ──────────────────────────────────────────────────────
     attempt = ChallengeAttempt(
@@ -228,10 +255,11 @@ async def submit_challenge(
         user_id=current_user.id,
         challenge_id=cid,
         submitted_code=body.code,
-        tests_passed=eval_result["tests_passed"],
-        tests_total=eval_result["tests_total"],
-        passed=eval_result["passed"],
-        submitted_at=datetime.utcnow(),
+        tests_passed=tests_passed,
+        tests_total=tests_total,
+        mcqs_passed=mcqs_passed,
+        passed=passed,
+        submitted_at=datetime.now(timezone.utc),
     )
     db.add(attempt)
     await db.commit()
@@ -239,7 +267,7 @@ async def submit_challenge(
 
     # ── Check if user needs more practice on this topic ───────────────────
     suggest_more_practice = False
-    if not eval_result["passed"]:
+    if not passed:
         # Count failures on the same topic
         fail_count_result = await db.execute(
             select(func.count(ChallengeAttempt.id))
@@ -259,7 +287,7 @@ async def submit_challenge(
         f"A developer submitted code for a '{challenge.difficulty}' challenge titled "
         f"'{challenge.title}' (topic: {challenge.topic}).\n\n"
         f"Their code:\n```python\n{body.code}\n```\n\n"
-        f"Test result: {eval_result['tests_passed']}/{eval_result['tests_total']} tests passed.\n\n"
+        f"Test result: {tests_passed}/{tests_total} tests passed.\n\n"
         f"Reference solution:\n```python\n{challenge.solution or 'N/A'}\n```\n\n"
         f"Write exactly 3 paragraphs:\n"
         f"1. Explain what the correct approach is and why.\n"
@@ -276,11 +304,12 @@ async def submit_challenge(
     return AttemptResult(
         attempt_id=str(attempt.id),
         challenge_id=challenge_id,
-        tests_passed=eval_result["tests_passed"],
-        tests_total=eval_result["tests_total"],
-        passed=eval_result["passed"],
-        output=eval_result["output"],
-        error=eval_result.get("error"),
+        tests_passed=tests_passed,
+        tests_total=tests_total,
+        mcqs_passed=mcqs_passed,
+        passed=passed,
+        output=json.dumps(eval_result),
+        error=eval_result.get("stderr"),
         feedback=feedback,
         suggest_more_practice=suggest_more_practice,
         topic=challenge.topic if suggest_more_practice else None,
@@ -310,7 +339,7 @@ async def challenge_history(
         select(ChallengeAttempt, Challenge)
         .join(Challenge, ChallengeAttempt.challenge_id == Challenge.id)
         .where(ChallengeAttempt.user_id == current_user.id)
-        .order_by(ChallengeAttempt.submitted_at.desc())
+        .order_by(ChallengeAttempt.attempted_at.desc())
         .limit(20)
     )
 
@@ -323,10 +352,12 @@ async def challenge_history(
                 challenge_title=challenge.title,
                 challenge_topic=challenge.topic,
                 difficulty=challenge.difficulty,
+                language=challenge.language,
                 passed=attempt.passed,
                 tests_passed=attempt.tests_passed,
                 tests_total=attempt.tests_total,
-                submitted_at=attempt.submitted_at,
+                mcqs_passed=attempt.mcqs_passed,
+                submitted_at=attempt.attempted_at,
             )
         )
 

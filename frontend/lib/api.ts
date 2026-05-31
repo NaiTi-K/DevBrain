@@ -239,48 +239,25 @@ export async function generateChallenge(): Promise<Challenge> {
 export async function submitChallenge(
   id: string,
   code: string,
+  language: string,
+  mcq_answers: number[] = [],
 ): Promise<any> {
   const res = await apiRequest<any>(
     "POST",
     `/challenges/${id}/submit`,
-    { code },
+    { code, language, mcq_answers },
   );
-  if (!res) return null;
-
-  const outputLines = res.output ? res.output.split("\n") : [];
-  const testResults = outputLines.map((line: string) => {
-    const passed = line.includes("✅");
-    let error: string | undefined = undefined;
-    let expected: string | undefined = undefined;
-    let got: string | undefined = undefined;
-    
-    if (!passed) {
-      error = line;
-      const match = line.match(/expected\s+['"]?([^'"]+)['"]?,\s+got\s+['"]?([^'"]+)['"]?/);
-      if (match) {
-        expected = match[1];
-        got = match[2];
-      }
-    }
-    
-    return {
-      passed,
-      input: "",
-      expected,
-      got,
-      error
-    };
-  });
-
-  const testsTotal = res.tests_total ?? 1;
-  const testsPassed = res.tests_passed ?? 0;
+  const testsTotal = res.tests_total || 1;
+  const testsPassed = res.tests_passed || 0;
   const score = Math.round((testsPassed / testsTotal) * 100);
 
   return {
     passed: res.passed,
-    test_results: testResults,
+    score,
     feedback: res.feedback,
-    score
+    output: res.output,
+    error: res.error,
+    mcqs_passed: res.mcqs_passed,
   };
 }
 
@@ -331,10 +308,14 @@ export async function submitCodeReview(
     })),
     edge_cases: review.edge_cases ?? [],
     improvements: (review.improvements ?? []).map((i: any) => ({
-      description: `${i.title}: ${i.description}`,
-      code: i.code_example
+      title: i.title || "Improvement",
+      description: i.description,
+      code_after: i.code_after || i.code_example,
+      verification: i.verification
     })),
     best_practices: review.best_practices ?? [],
+    ast_facts: review.ast_facts,
+    lint_facts: review.lint_facts,
     reviewed_at: new Date().toISOString()
   };
 }

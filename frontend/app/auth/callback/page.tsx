@@ -6,14 +6,14 @@
 // Stores token in localStorage and forwards to /dashboard.
 // =============================================================================
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Brain, AlertTriangle } from "lucide-react";
 import { setToken } from "@/lib/api";
 
 type Status = "loading" | "success" | "error";
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<Status>("loading");
@@ -92,5 +92,13 @@ export default function AuthCallbackPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0f1117] flex items-center justify-center"><div className="text-white">Loading...</div></div>}>
+      <AuthCallbackContent />
+    </Suspense>
   );
 }

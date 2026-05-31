@@ -6,10 +6,10 @@ SQLAlchemy ORM model for authenticated GitHub users.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -44,6 +44,7 @@ class User(Base):
     # ── Profile fields ────────────────────────────────────────────────────────
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resume_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # ── Career target ─────────────────────────────────────────────────────────
     # Allowed values: "SDE Intern", "Backend", "ML", "Full-Stack", "DevOps"
@@ -53,7 +54,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
 

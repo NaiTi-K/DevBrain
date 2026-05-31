@@ -15,19 +15,26 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ),
 });
 
-type TestResult = {
-  passed: boolean;
-  input?: string;
-  expected?: string;
-  got?: string;
-  error?: string;
-};
+interface TestResult {
+  case: number;
+  status: "AC" | "WA" | "CE" | "RE" | "TLE";
+  stdout: string;
+  expected: string;
+}
+
+interface Verdict {
+  status: "AC" | "WA" | "CE" | "RE" | "TLE";
+  stderr: string;
+  test_results: TestResult[];
+}
 
 type SubmitResult = {
   passed: boolean;
-  test_results: TestResult[];
+  output: string;
+  error?: string;
   feedback: string;
   score?: number;
+  mcqs_passed?: number;
 };
 
 type HistoryEntry = {
@@ -56,59 +63,71 @@ function DiffBadge({ difficulty }: { difficulty: string }) {
   );
 }
 
-function TestCaseRow({ result, i }: { result: TestResult; i: number }) {
-  const [open, setOpen] = useState(false);
+function TestCaseInput({ input }: { input: Record<string, unknown> }) {
+  if (!input || typeof input !== "object") return <span>{String(input)}</span>;
   return (
-    <div className="border border-[#2d3148] rounded-lg overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#2d3148]/30 transition-colors"
-      >
-        <span
-          className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-            result.passed
-              ? "bg-[#22c55e22] text-[#22c55e]"
-              : "bg-[#ef444422] text-[#ef4444]"
-          }`}
-        >
-          {result.passed ? "✓" : "✗"}
-        </span>
-        <span className="text-gray-300">Test case {i + 1}</span>
-        <span className="ml-auto text-gray-600 text-xs">
-          {open ? "▴" : "▾"}
-        </span>
-      </button>
-      {open && (
-        <div className="px-4 pb-3 space-y-1.5 text-xs font-mono">
-          {result.input && (
-            <div>
-              <span className="text-gray-500">Input: </span>
-              <span className="text-gray-300">{result.input}</span>
+    <div className="font-mono text-sm space-y-1">
+      {Object.entries(input).map(([key, val]) => (
+        <div key={key}>
+          <span className="text-muted-foreground text-gray-500">{key}</span>
+          <span className="text-gray-400">{" = "}</span>
+          <span className="text-foreground text-gray-200">{JSON.stringify(val)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const STATUS_CONFIG = {
+  AC:  { label: "Accepted",              color: "text-green-500",  bg: "bg-[#22c55e22]"  },
+  WA:  { label: "Wrong Answer",          color: "text-red-500",    bg: "bg-[#ef444422]"  },
+  CE:  { label: "Compilation Error",     color: "text-red-500",    bg: "bg-[#ef444422]"  },
+  RE:  { label: "Runtime Error",         color: "text-orange-500", bg: "bg-[#f9731622]"  },
+  TLE: { label: "Time Limit Exceeded",   color: "text-orange-500", bg: "bg-[#f9731622]"  },
+};
+
+function VerdictPanel({ verdict, testCases }: { verdict: Verdict, testCases?: any[] }) {
+  // If parsing failed or verdict is malformed
+  if (!verdict || !verdict.status) {
+     return <div className="text-red-500">Evaluation error.</div>;
+  }
+  const cfg = STATUS_CONFIG[verdict.status] || STATUS_CONFIG["WA"];
+
+  return (
+    <div className={`rounded-lg p-4 ${cfg.bg}`}>
+      <p className={`font-semibold text-lg ${cfg.color}`}>{cfg.label}</p>
+
+      {/* Show compiler/runtime stderr */}
+      {(verdict.status === "CE" || verdict.status === "RE") && verdict.stderr && (
+        <pre className="mt-2 text-xs text-red-400 whitespace-pre-wrap font-mono">
+          {verdict.stderr}
+        </pre>
+      )}
+
+      {/* Per-test-case breakdown */}
+      {verdict.test_results?.map((tr) => (
+        <div key={tr.case} className="mt-3 border-t border-white/10 pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className={`font-medium ${tr.status === "AC" ? "text-green-400" : "text-red-400"}`}>
+              Case {tr.case + 1}: {tr.status === "AC" ? "Passed" : "Failed"}
+            </span>
+          </div>
+          
+          {/* Input display */}
+          {testCases && testCases[tr.case]?.input && (
+            <div className="mb-2 bg-black/20 p-2 rounded">
+              <TestCaseInput input={testCases[tr.case].input} />
             </div>
           )}
-          {result.expected && (
-            <div>
-              <span className="text-gray-500">Expected: </span>
-              <span className="text-[#22c55e]">{result.expected}</span>
-            </div>
-          )}
-          {result.got && (
-            <div>
-              <span className="text-gray-500">Got: </span>
-              <span
-                className={result.passed ? "text-[#22c55e]" : "text-[#ef4444]"}
-              >
-                {result.got}
-              </span>
-            </div>
-          )}
-          {result.error && (
-            <div>
-              <span className="text-[#ef4444]">{result.error}</span>
+
+          {tr.status === "WA" && (
+            <div className="text-xs mt-1 font-mono space-y-1 bg-black/20 p-2 rounded">
+              <div><span className="text-gray-500">Expected: </span><span className="text-green-400">{tr.expected}</span></div>
+              <div><span className="text-gray-500">Got:      </span><span className="text-red-400">{tr.stdout}</span></div>
             </div>
           )}
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -121,7 +140,10 @@ export default function ChallengesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [mcqAnswers, setMcqAnswers] = useState<Record<number, number>>({});
+  const [activeStep, setActiveStep] = useState<"code" | "mcq">("code");
+  const [language, setLanguage] = useState<string>("python");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -143,23 +165,32 @@ export default function ChallengesPage() {
     try {
       const c = await generateChallenge();
       setChallenge(c);
-      setCode(c.starter_code ?? "");
+      setLanguage("python");
+      setCode(c.starter_codes?.["python"] ?? c.starter_code ?? "");
     } catch (e: any) {
       setError(e?.message ?? "Failed to generate challenge. Please try again.");
     } finally {
       setGenerating(false);
+      setMcqAnswers({});
+      setActiveStep("code");
     }
   };
 
   const handleSubmit = async () => {
     if (!challenge || !code.trim()) return;
     setSubmitting(true);
-    setResult(null);
     setError(null);
     try {
-      const r = await submitChallenge(challenge.id, code);
-      setResult(r);
-      // Refresh history
+      const isMcqStep = activeStep === "mcq";
+      const answersArray = isMcqStep ? (challenge.mcqs?.map((_: any, i: number) => mcqAnswers[i] ?? -1) ?? []) : [];
+      const r = await submitChallenge(challenge.id, code, language, answersArray);
+      
+      if (r.passed && !isMcqStep && challenge.mcqs?.length > 0) {
+        setActiveStep("mcq");
+      } else {
+        setResult(r);
+      }
+      
       const h = await getChallengeHistory().catch(() => []);
       setHistory(h ?? []);
     } catch (e: any) {
@@ -219,7 +250,7 @@ export default function ChallengesPage() {
             </div>
 
             {/* Constraints */}
-            {challenge.constraints?.length > 0 && (
+            {(challenge.constraints?.length ?? 0) > 0 && (
               <details className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl overflow-hidden">
                 <summary className="px-5 py-3.5 text-sm font-semibold text-white cursor-pointer hover:bg-[#2d3148]/30 transition-colors flex items-center justify-between">
                   <span>📏 Constraints</span>
@@ -227,7 +258,7 @@ export default function ChallengesPage() {
                 </summary>
                 <div className="px-5 pb-4">
                   <ul className="space-y-1.5">
-                    {challenge.constraints.map((c: string, i: number) => (
+                    {challenge.constraints?.map((c: string, i: number) => (
                       <li key={i} className="text-gray-400 text-sm flex gap-2">
                         <span className="text-[#6366f1]">•</span>
                         {c}
@@ -239,13 +270,13 @@ export default function ChallengesPage() {
             )}
 
             {/* Examples */}
-            {challenge.examples?.length > 0 && (
+            {(challenge.examples?.length ?? 0) > 0 && (
               <details className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl overflow-hidden" open>
                 <summary className="px-5 py-3.5 text-sm font-semibold text-white cursor-pointer hover:bg-[#2d3148]/30 transition-colors">
                   💡 Examples
                 </summary>
                 <div className="px-5 pb-4 space-y-3">
-                  {challenge.examples.map(
+                  {challenge.examples?.map(
                     (ex: { input: string; output: string; explanation?: string }, i: number) => (
                       <div
                         key={i}
@@ -262,6 +293,37 @@ export default function ChallengesPage() {
                         {ex.explanation && (
                           <p className="text-gray-500 mt-1">{ex.explanation}</p>
                         )}
+                      </div>
+                    )
+                  )}
+                </div>
+              </details>
+            )}
+
+            {/* Test Cases (Read-only) */}
+            {activeStep === "code" && challenge.test_cases?.length > 0 && (
+              <details className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl overflow-hidden">
+                <summary className="px-5 py-3.5 text-sm font-semibold text-white cursor-pointer hover:bg-[#2d3148]/30 transition-colors">
+                  🧪 Test Cases ({challenge.test_cases.length})
+                </summary>
+                <div className="px-5 pb-4 space-y-3">
+                  {challenge.test_cases.map(
+                    (tc: { input: string; expected_output: string; expected?: string; type?: string }, i: number) => (
+                      <div
+                        key={i}
+                        className="bg-[#0f1117] rounded-lg p-3 text-xs font-mono"
+                      >
+                        {tc.type && (
+                           <p className="text-[#6366f1] mb-1 font-bold">{tc.type}</p>
+                        )}
+                        <p>
+                          <span className="text-gray-500">Input: </span>
+                          <span className="text-gray-300">{(tc.input || "").length > 100 ? tc.input.substring(0, 100) + "..." : tc.input}</span>
+                        </p>
+                        <p>
+                          <span className="text-gray-500">Expected: </span>
+                          <span className="text-[#22c55e]">{tc.expected_output || tc.expected}</span>
+                        </p>
                       </div>
                     )
                   )}
@@ -292,12 +354,20 @@ export default function ChallengesPage() {
                       Score: {result.score}/100
                     </span>
                   )}
+                  {result.mcqs_passed !== undefined && activeStep === "mcq" && (
+                    <span className="ml-auto text-sm font-semibold text-[#6366f1]">
+                      MCQs: {result.mcqs_passed}/{challenge.mcqs?.length ?? 0}
+                    </span>
+                  )}
                 </div>
-                {result.test_results?.length > 0 && (
+                {result.output && (
                   <div className="space-y-2 mb-3">
-                    {result.test_results.map((tr, i) => (
-                      <TestCaseRow key={i} result={tr} i={i} />
-                    ))}
+                    <VerdictPanel 
+                      verdict={(() => {
+                        try { return JSON.parse(result.output); } catch { return null; }
+                      })()} 
+                      testCases={challenge.test_cases}
+                    />
                   </div>
                 )}
                 {result.feedback && (
@@ -310,51 +380,153 @@ export default function ChallengesPage() {
                     </p>
                   </div>
                 )}
+                
+                {/* Step transition */}
+                {!result.passed && activeStep === "code" && (
+                  <button 
+                    onClick={() => setActiveStep("mcq")}
+                    className="mt-4 w-full bg-[#ec4899] hover:bg-[#db2777] text-white py-2 rounded-lg text-sm font-semibold transition-colors"
+                  >
+                    Try Knowledge Check Instead
+                  </button>
+                )}
               </div>
             )}
           </div>
 
-          {/* ── Right: Editor ── */}
+          {/* ── Right: Editor or Knowledge Check ── */}
           <div className="flex flex-col gap-4">
-            <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]" />
-                <span className="text-gray-400 text-xs font-medium uppercase tracking-widest">
-                  {challenge.language ?? "python"}
-                </span>
-              </div>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || !code.trim()}
-                className="px-4 py-2 bg-[#22c55e] hover:bg-[#16a34a] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {submitting ? (
-                  <>
-                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Running…
-                  </>
-                ) : (
-                  "▶ Submit"
-                )}
-              </button>
-            </div>
+            {activeStep === "code" ? (
+              <>
+                <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]" />
+                    <select
+                      value={language}
+                      onChange={(e) => {
+                        const newLang = e.target.value;
+                        setLanguage(newLang);
+                        if (challenge.starter_codes && challenge.starter_codes[newLang]) {
+                          setCode(challenge.starter_codes[newLang]);
+                        }
+                      }}
+                      disabled={submitting}
+                      className="bg-transparent text-gray-400 text-xs font-medium uppercase tracking-widest outline-none cursor-pointer appearance-none border border-[#2d3148] rounded px-2 py-1 hover:text-white transition-colors"
+                    >
+                      <option value="python">Python</option>
+                      <option value="java">Java</option>
+                      <option value="cpp">C++</option>
+                    </select>
+                  </div>
+                  
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="flex items-center gap-2 bg-[#22c55e] hover:bg-[#16a34a] text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(34,197,94,0.3)]"
+                  >
+                    {submitting ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                    Run Code
+                  </button>
+                </div>
 
-            <div className="flex-1 bg-[#1a1d2e] border border-[#2d3148] rounded-xl overflow-hidden shadow-[0_0_15px_rgba(99,102,241,0.1)] min-h-[400px]">
-              <MonacoEditor
-                language={challenge.language ?? "python"}
-                value={code}
-                onChange={(v) => setCode(v ?? "")}
-                theme="vs-dark"
-                options={{
-                  fontSize: 13,
-                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  padding: { top: 16, bottom: 16 },
-                  readOnly: false,
-                }}
-              />
-            </div>
+                <div className="flex-1 bg-[#1a1d2e] border border-[#2d3148] rounded-xl overflow-hidden shadow-[0_0_15px_rgba(99,102,241,0.1)] min-h-[500px]">
+                  <MonacoEditor
+                    language={language.replace("cpp", "c++")}
+                    value={code}
+                    onChange={(v) => setCode(v ?? "")}
+                    theme="vs-dark"
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 14,
+                      lineHeight: 24,
+                      padding: { top: 20 },
+                      scrollBeyondLastLine: false,
+                      smoothScrolling: true,
+                      cursorBlinking: "smooth",
+                      cursorSmoothCaretAnimation: "on",
+                      formatOnPaste: true,
+                      readOnly: false,
+                    }}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 bg-[#1a1d2e] border border-[#2d3148] rounded-xl overflow-hidden shadow-[0_0_15px_rgba(236,72,153,0.1)] flex flex-col">
+                <div className="bg-[#2d3148]/30 px-6 py-4 flex items-center justify-between border-b border-[#2d3148]">
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <span className="text-2xl">🧠</span> Knowledge Check
+                  </h2>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting || result != null}
+                    className="flex items-center gap-2 bg-[#ec4899] hover:bg-[#db2777] text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(236,72,153,0.3)]"
+                  >
+                    {submitting ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      "Submit Answers"
+                    )}
+                  </button>
+                </div>
+                <div className="p-8 space-y-8 overflow-y-auto">
+                  {challenge.mcqs?.map((mcq: any, i: number) => (
+                    <div key={i} className="bg-[#0f1117] rounded-xl p-6 border border-[#2d3148]">
+                      <p className="text-gray-200 text-base font-medium leading-relaxed mb-4">
+                        <span className="text-[#ec4899] font-bold mr-2">Q{i + 1}.</span>
+                        {mcq.question}
+                      </p>
+                      <div className="space-y-3">
+                        {mcq.options.map((opt: string, optIdx: number) => (
+                          <label
+                            key={optIdx}
+                            className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
+                              mcqAnswers[i] === optIdx
+                                ? "bg-[#ec489911] border-[#ec489955]"
+                                : "bg-[#1a1d2e] border-[#2d3148] hover:border-gray-500"
+                            } ${
+                              result
+                                ? optIdx === mcq.correct_index
+                                  ? "bg-[#22c55e11] border-[#22c55e55]"
+                                  : mcqAnswers[i] === optIdx
+                                  ? "bg-[#ef444411] border-[#ef444455]"
+                                  : "opacity-50 cursor-default"
+                                : ""
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name={`mcq-${i}`}
+                              checked={mcqAnswers[i] === optIdx}
+                              onChange={() => !result && setMcqAnswers(prev => ({ ...prev, [i]: optIdx }))}
+                              disabled={!!result}
+                              className="mt-0.5 text-[#ec4899] focus:ring-[#ec4899] bg-transparent border-gray-600"
+                            />
+                            <span className={`text-sm ${result && optIdx === mcq.correct_index ? "text-[#22c55e] font-semibold" : "text-gray-300"}`}>
+                              {opt}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      {result && mcq.explanation && (
+                        <div className="mt-4 p-4 bg-[#2d3148]/20 border-l-4 border-[#6366f1] rounded-r-lg">
+                          <p className="text-sm text-gray-300">
+                            <span className="font-semibold text-[#6366f1] mr-2">Explanation:</span>
+                            {mcq.explanation}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

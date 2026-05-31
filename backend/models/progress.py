@@ -5,11 +5,10 @@ Used for streak tracking, skill-delta charts, and exam readiness scoring.
 """
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy import Date, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy import TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 

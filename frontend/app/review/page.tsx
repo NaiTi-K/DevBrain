@@ -356,25 +356,37 @@ export default function ReviewPage() {
                     Quality Score
                   </p>
                   <div className="flex items-center gap-3 flex-wrap">
-                    {review.time_complexity && (
+                    {review.complexity?.time && (
                       <span className="text-xs bg-[#6366f122] text-[#6366f1] px-2 py-1 rounded-full">
-                        ⏱ {review.time_complexity}
+                        ⏱ {review.complexity.time}
                       </span>
                     )}
-                    {review.space_complexity && (
+                    {review.complexity?.space && (
                       <span className="text-xs bg-[#22c55e22] text-[#22c55e] px-2 py-1 rounded-full">
-                        💾 {review.space_complexity}
-                      </span>
-                    )}
-                    {review.reflection_loops != null && (
-                      <span className="text-xs bg-[#f59e0b22] text-[#f59e0b] px-2 py-1 rounded-full">
-                        🔄 {review.reflection_loops} reflection loop
-                        {review.reflection_loops !== 1 ? "s" : ""}
+                        💾 {review.complexity.space}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
+
+              {/* Pre-Computed Facts */}
+              {(review.ast_facts || review.lint_facts) && (
+                <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-5 shadow-[0_0_15px_rgba(99,102,241,0.1)] flex gap-4 overflow-x-auto">
+                  {review.ast_facts && (
+                    <div className="flex-1 min-w-[250px]">
+                      <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">AST Analysis</p>
+                      <pre className="text-xs text-gray-300 bg-[#0f1117] p-2 rounded-lg">{JSON.stringify(review.ast_facts, null, 2)}</pre>
+                    </div>
+                  )}
+                  {review.lint_facts && (
+                    <div className="flex-1 min-w-[250px]">
+                      <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">Linter Report</p>
+                      <pre className="text-xs text-gray-300 bg-[#0f1117] p-2 rounded-lg">{JSON.stringify(review.lint_facts, null, 2)}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Summary */}
               {review.summary && (
@@ -395,7 +407,7 @@ export default function ReviewPage() {
                   defaultOpen
                 >
                   <div className="space-y-2">
-                    {annotations.map((a: { line?: number; message: string }, i) => (
+                    {annotations.map((a: any, i: number) => (
                       <div
                         key={i}
                         className="flex gap-3 text-sm"
@@ -434,17 +446,22 @@ export default function ReviewPage() {
                   <div className="space-y-4">
                     {improvements.map(
                       (
-                        imp: { description: string; code?: string },
+                        imp: any,
                         i
                       ) => (
                         <div key={i}>
                           <p className="text-gray-300 text-sm mb-2">
                             {imp.description}
                           </p>
-                          {imp.code && (
+                          {imp.code_after && (
                             <pre className="bg-[#0f1117] border border-[#2d3148] rounded-lg p-3 text-xs font-mono text-gray-300 overflow-x-auto">
-                              {imp.code}
+                              {imp.code_after}
                             </pre>
+                          )}
+                          {imp.verification && (
+                            <div className={`mt-2 px-3 py-2 rounded-lg border text-sm flex gap-2 ${imp.verification.verified ? 'bg-[#22c55e11] border-[#22c55e55] text-[#22c55e]' : 'bg-[#ef444411] border-[#ef444455] text-[#ef4444]'}`}>
+                              <strong>{imp.verification.badge}</strong>: {imp.verification.message}
+                            </div>
                           )}
                         </div>
                       )

@@ -40,7 +40,6 @@ export interface SkillProfile {
   frameworks_detected: string[];
   weak_areas: string[];
   strong_areas: string[];
-  last_analyzed_at: string;
   created_at: string;
   updated_at: string;
 }
@@ -82,6 +81,7 @@ export interface Roadmap {
   current_week: number;
   total_weeks: number;
   items: RoadmapItem[];
+  weeks?: any[];
   focus_areas: string[];
   generated_at: string;
   updated_at: string;
@@ -105,6 +105,13 @@ export interface TestCase {
   explanation?: string;
 }
 
+export interface MCQ {
+  question: string;
+  options: string[];
+  correct_index: number;
+  explanation: string;
+}
+
 export interface Challenge {
   id: string;
   user_id: string;
@@ -114,7 +121,11 @@ export interface Challenge {
   topic: string;
   language: string;
   starter_code: string;
-  test_cases: TestCase[];
+  starter_codes?: Record<string, string>;
+  constraints?: string[];
+  examples?: any[];
+  test_cases: any[];
+  mcqs: MCQ[];
   hints: string[];
   solution_explanation?: string;
   status: ChallengeStatus;
@@ -131,6 +142,7 @@ export interface ChallengeAttempt {
   result: SubmissionResult;
   test_cases_passed: number;
   test_cases_total: number;
+  mcqs_passed: number;
   execution_time_ms: number | null;
   feedback: string;
   score: number; // 0–1
@@ -139,6 +151,7 @@ export interface ChallengeAttempt {
 
 export interface SubmitChallengeRequest {
   code: string;
+  mcq_answers: number[];
 }
 
 export interface SubmitChallengeResponse {
@@ -161,19 +174,33 @@ export interface ReviewIssue {
 }
 
 export interface CodeReview {
-  id: string;
-  user_id: string;
+  id?: string;
+  user_id?: string;
   code: string;
   language: string;
-  context: string | null;
-  quality_score: number; // 0–1
-  quality_label: ReviewQuality;
-  issues: ReviewIssue[];
+  context?: string | null;
+  score: number;
+  annotations: ReviewIssue[];
+  complexity?: { time: string; space: string };
+  edge_cases: string[];
+  improvements: {
+    title: string;
+    description: string;
+    code_after?: string;
+    verification?: {
+      verified: boolean;
+      badge: string;
+      message: string;
+      speedup?: number;
+    };
+  }[];
+  best_practices: string[];
   summary: string;
-  suggestions: string[];
-  reflection_cycles: number; // LangGraph cycles used
-  final_feedback: string;
-  reviewed_at: string;
+  ast_facts?: any;
+  lint_facts?: any;
+  time_complexity?: string;
+  space_complexity?: string;
+  reflection_loops?: number;
 }
 
 export interface SubmitCodeReviewRequest {
@@ -200,6 +227,7 @@ export interface Resource {
   tags: string[];
   source: "rag" | "web_search";
   relevance_score: number; // 0–1
+  why_recommended?: string;
 }
 
 export interface ResourceSearchResponse {
@@ -207,6 +235,7 @@ export interface ResourceSearchResponse {
   total: number;
   topic: string;
   difficulty: RoadmapDifficulty | null;
+  learning_path?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +317,7 @@ export interface ProgressDashboard {
   top_improvements: string[];
   focus_recommendations: string[];
   daily_activity: DailyActivity[]; // last 30 days
+  recent_activity?: any[];
   weekly_challenge_goal: number;
   weekly_challenges_done: number;
 }

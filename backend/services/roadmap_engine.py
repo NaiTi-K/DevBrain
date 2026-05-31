@@ -22,7 +22,7 @@ import json
 import logging
 from typing import Any
 
-from services.profile_engine import MASTERED_THRESHOLD, PROFICIENT_THRESHOLD
+from services.profile_engine import MASTERED_THRESHOLD
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ AI-generated coding challenges and the user attempts against them.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -38,6 +38,8 @@ class Challenge(Base):
 
     # ── Challenge specification ────────────────────────────────────────────────
     topic: Mapped[str] = mapped_column(String(100), nullable=False)
+    # "Python" | "JavaScript" | "C++"
+    language: Mapped[str] = mapped_column(String(20), nullable=False, default="Python")
     # "easy" | "medium" | "hard"
     difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -50,16 +52,22 @@ class Challenge(Base):
 
     constraints: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     examples: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    mcqs: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    starter_codes: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # ── Reference solution (nullable — not always revealed) ───────────────────
     solution: Mapped[str | None] = mapped_column(Text, nullable=True)
     starter_code: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
+    # ── Schema and Judgement ──────────────────────────────────────────────────
+    schema: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    judge: Mapped[str] = mapped_column(String(50), nullable=False, default="exact")
+
     # ── Timestamps ────────────────────────────────────────────────────────────
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
 
@@ -111,6 +119,7 @@ class ChallengeAttempt(Base):
     passed: Mapped[bool] = mapped_column(nullable=False)
     tests_passed: Mapped[int] = mapped_column(Integer, nullable=False)
     tests_total: Mapped[int] = mapped_column(Integer, nullable=False)
+    mcqs_passed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # ── Timing ────────────────────────────────────────────────────────────────
@@ -121,7 +130,7 @@ class ChallengeAttempt(Base):
     attempted_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
 

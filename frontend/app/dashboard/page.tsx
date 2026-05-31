@@ -309,7 +309,10 @@ export default function DashboardPage() {
             </h2>
             <SkillRadarChart
               skills={skills}
-              delta={dashboard?.skill_delta_7d}
+              delta={dashboard?.skill_deltas?.reduce((acc, curr) => {
+                acc[curr.skill] = curr.delta_7d;
+                return acc;
+              }, {} as Record<string, number>)}
             />
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-gray-400">Overall Level</span>

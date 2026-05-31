@@ -1,20 +1,26 @@
-
 import asyncio
-from sqlalchemy import delete
-from models.database import async_session
-from models.roadmap import Roadmap
-from services.cache_service import cache
+import asyncpg
+import sys
 
-async def main():
-    # Clear Redis
-    await cache.redis.flushdb()
-    print('Redis cleared.')
+# Configure your DB URL here if it changes
+DB_URL = "postgresql://devbrain_user:devbrain_pass@localhost:5432/devbrain_db"
 
-    # Clear Roadmaps
-    async with async_session() as session:
-        await session.execute(delete(Roadmap))
-        await session.commit()
-    print('Roadmaps cleared.')
+async def clear_db():
+    print(f"Connecting to {DB_URL}...")
+    try:
+        conn = await asyncpg.connect(DB_URL)
+        
+        print("Clearing challenge_attempts...")
+        await conn.execute("DELETE FROM challenge_attempts")
+        
+        print("Clearing challenges...")
+        await conn.execute("DELETE FROM challenges")
+        
+        print("Database cleared successfully!")
+        await conn.close()
+    except Exception as e:
+        print(f"Error clearing database: {e}")
+        sys.exit(1)
 
-asyncio.run(main())
-
+if __name__ == "__main__":
+    asyncio.run(clear_db())

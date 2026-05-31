@@ -1,7 +1,6 @@
 import asyncio
 import uuid
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from httpx import AsyncClient, ASGITransport
 
 import sys
@@ -49,7 +48,7 @@ async def main():
             )
             print(f"Status Code: {response.status_code}")
             print(f"Response Body: {response.text}")
-        except Exception as e:
+        except Exception:
             print("Error during request:")
             import traceback
             traceback.print_exc()
