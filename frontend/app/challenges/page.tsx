@@ -325,10 +325,10 @@ export default function ChallengesPage() {
             {activeStep === "code" && challenge.test_cases?.length > 0 && (
               <details className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl overflow-hidden">
                 <summary className="px-5 py-3.5 text-sm font-semibold text-white cursor-pointer hover:bg-[#2d3148]/30 transition-colors">
-                  🧪 Test Cases ({challenge.test_cases.length})
+                  🧪 Sample Test Cases ({Math.min(4, challenge.test_cases.length)})
                 </summary>
                 <div className="px-5 pb-4 space-y-3">
-                  {challenge.test_cases.map(
+                  {challenge.test_cases.slice(0, 4).map(
                     (tc: { input: string; expected_output: string; expected?: string; type?: string }, i: number) => (
                       <div
                         key={i}
@@ -352,6 +352,11 @@ export default function ChallengesPage() {
                         </p>
                       </div>
                     )
+                  )}
+                  {challenge.test_cases.length > 4 && (
+                    <div className="text-xs text-gray-500 text-center py-2 border-t border-white/5 font-sans">
+                      🔒 +{challenge.test_cases.length - 4} private test cases are hidden and will be executed upon code submission.
+                    </div>
                   )}
                 </div>
               </details>
@@ -380,8 +385,8 @@ export default function ChallengesPage() {
                       Score: {result.score}/100
                     </span>
                   )}
-                  {result.mcqs_passed !== undefined && activeStep === "mcq" && (
-                    <span className="ml-auto text-sm font-semibold text-[#6366f1]">
+                  {mcqsSubmitted && result.mcqs_passed !== undefined && (
+                    <span className="ml-auto text-sm font-semibold text-pink-400">
                       MCQs: {result.mcqs_passed}/{challenge.mcqs?.length ?? 0}
                     </span>
                   )}
@@ -396,6 +401,21 @@ export default function ChallengesPage() {
                     />
                   </div>
                 )}
+
+                {mcqsSubmitted && result.mcqs_passed !== undefined && (
+                  <div className="mb-3 bg-pink-500/10 border border-pink-500/20 rounded-xl p-4 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-pink-400 uppercase tracking-widest">🧠 MCQ Scorecard</span>
+                      <span className="text-xs font-bold text-white bg-pink-500/20 px-2.5 py-0.5 rounded font-mono">
+                        {Math.round((result.mcqs_passed / (challenge.mcqs?.length || 1)) * 100)}% Accuracy
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-relaxed font-sans">
+                      💡 **Scoring Weightage:** Theoretical questions represent equal weightage of your theoretical evaluation score.
+                    </p>
+                  </div>
+                )}
+
                 {result.feedback && (
                   <div className="bg-[#0f1117] rounded-lg p-3">
                     <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">

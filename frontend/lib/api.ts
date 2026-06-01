@@ -249,7 +249,11 @@ export async function submitChallenge(
   );
   const testsTotal = res.tests_total || 1;
   const testsPassed = res.tests_passed || 0;
-  const score = Math.round((testsPassed / testsTotal) * 100);
+  
+  // Blended score: 50% code + 50% MCQs
+  const codeScore = (testsPassed / testsTotal) * 50;
+  const mcqScore = (res.mcqs_passed / 3) * 50;
+  const score = Math.round(codeScore + mcqScore);
 
   return {
     passed: res.passed,
@@ -265,14 +269,21 @@ export async function submitChallenge(
 export async function getChallengeHistory(): Promise<any[]> {
   const items = await apiRequest<any[]>("GET", "/challenges/history");
   if (!items) return [];
-  return items.map(item => ({
-    id: item.attempt_id,
-    title: item.challenge_title,
-    language: item.language || "python",
-    passed: item.passed,
-    score: Math.round((item.tests_passed / (item.tests_total || 1)) * 100),
-    created_at: item.submitted_at
-  }));
+  return items.map(item => {
+    // Blended score: 50% code + 50% MCQs
+    const codeScore = (item.tests_passed / (item.tests_total || 1)) * 50;
+    const mcqScore = (item.mcqs_passed / 3) * 50;
+    const score = Math.round(codeScore + mcqScore);
+
+    return {
+      id: item.attempt_id,
+      title: item.challenge_title,
+      language: item.language || "python",
+      passed: item.passed,
+      score: score,
+      created_at: item.submitted_at
+    };
+  });
 }
 
 /** Get full details of a specific past attempt. */
