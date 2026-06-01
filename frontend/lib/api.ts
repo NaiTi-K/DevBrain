@@ -268,11 +268,16 @@ export async function getChallengeHistory(): Promise<any[]> {
   return items.map(item => ({
     id: item.attempt_id,
     title: item.challenge_title,
-    language: "python",
+    language: item.language || "python",
     passed: item.passed,
     score: Math.round((item.tests_passed / (item.tests_total || 1)) * 100),
     created_at: item.submitted_at
   }));
+}
+
+/** Get full details of a specific past attempt. */
+export async function getAttemptDetails(attemptId: string): Promise<any> {
+  return await apiRequest<any>("GET", `/challenges/attempts/${attemptId}`);
 }
 
 // ---------------------------------------------------------------------------

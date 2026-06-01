@@ -8,7 +8,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev --prefer-offline
+RUN npm install --prefer-offline
 
 # ────────────────────────────────────────────────────────────────────────────
 # Stage 2: Build the Next.js application

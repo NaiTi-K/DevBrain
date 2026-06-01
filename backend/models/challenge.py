@@ -116,6 +116,8 @@ class ChallengeAttempt(Base):
 
     # ── Submission data ───────────────────────────────────────────────────────
     code: Mapped[str] = mapped_column(Text, nullable=False)
+    language: Mapped[str] = mapped_column(String(20), nullable=False, default="python")
+    output: Mapped[str | None] = mapped_column(Text, nullable=True)
     passed: Mapped[bool] = mapped_column(nullable=False)
     tests_passed: Mapped[int] = mapped_column(Integer, nullable=False)
     tests_total: Mapped[int] = mapped_column(Integer, nullable=False)

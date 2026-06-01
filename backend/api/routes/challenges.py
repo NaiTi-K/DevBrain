@@ -47,6 +47,7 @@ class ChallengeResponse(BaseModel):
     examples: list[dict] = []
     mcqs: list[dict] = []
     starter_codes: dict[str, str] = {}
+    test_cases: list[dict] = []
     # Note: solution is intentionally omitted from the response
 
     class Config:
@@ -128,6 +129,7 @@ async def generate_challenge(
             examples=existing_challenge.examples or [],
             mcqs=existing_challenge.mcqs or [],
             starter_codes=existing_challenge.starter_codes or {},
+            test_cases=existing_challenge.test_cases or [],
         )
 
     skill_profile: dict = {}
@@ -189,6 +191,7 @@ async def generate_challenge(
         examples=challenge.examples or [],
         mcqs=challenge.mcqs or [],
         starter_codes=challenge.starter_codes or {},
+        test_cases=challenge.test_cases or [],
     )
 
 
@@ -255,6 +258,8 @@ async def submit_challenge(
         user_id=current_user.id,
         challenge_id=cid,
         submitted_code=body.code,
+        language=body.language,
+        output=json.dumps(eval_result),
         tests_passed=tests_passed,
         tests_total=tests_total,
         mcqs_passed=mcqs_passed,
@@ -352,7 +357,7 @@ async def challenge_history(
                 challenge_title=challenge.title,
                 challenge_topic=challenge.topic,
                 difficulty=challenge.difficulty,
-                language=challenge.language,
+                language=attempt.language,
                 passed=attempt.passed,
                 tests_passed=attempt.tests_passed,
                 tests_total=attempt.tests_total,
@@ -362,3 +367,96 @@ async def challenge_history(
         )
 
     return items
+
+
+# ── GET /challenges/attempts/{attempt_id} ──────────────────────────────────────
+
+class AttemptDetailsResponse(BaseModel):
+    attempt_id: str
+    challenge_id: str
+    challenge_title: str
+    challenge_description: str
+    challenge_difficulty: str
+    challenge_topic: str
+    code: str
+    language: str
+    passed: bool
+    tests_passed: int
+    tests_total: int
+    mcqs_passed: int
+    output: Optional[str]
+    error: Optional[str]
+    feedback: Optional[str]
+    submitted_at: datetime
+    test_cases: list
+    mcqs: Optional[list] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get(
+    "/attempts/{attempt_id}",
+    response_model=AttemptDetailsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get complete details of a past challenge attempt",
+)
+async def get_attempt_details(
+    attempt_id: str,
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    try:
+        aid = uuid.UUID(attempt_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="attempt_id must be a valid UUID.",
+        )
+
+    result = await db.execute(
+        select(ChallengeAttempt, Challenge)
+        .join(Challenge, ChallengeAttempt.challenge_id == Challenge.id)
+        .where(
+            ChallengeAttempt.id == aid,
+            ChallengeAttempt.user_id == current_user.id
+        )
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attempt not found or unauthorized.",
+        )
+
+    attempt, challenge = row
+    
+    # Try parsing eval output to extract stderr
+    stderr = None
+    if attempt.output:
+        try:
+            eval_data = json.loads(attempt.output)
+            stderr = eval_data.get("stderr")
+        except Exception:
+            pass
+
+    return AttemptDetailsResponse(
+        attempt_id=str(attempt.id),
+        challenge_id=str(attempt.challenge_id),
+        challenge_title=challenge.title,
+        challenge_description=challenge.description,
+        challenge_difficulty=challenge.difficulty,
+        challenge_topic=challenge.topic,
+        code=attempt.code,
+        language=attempt.language,
+        passed=attempt.passed,
+        tests_passed=attempt.tests_passed,
+        tests_total=attempt.tests_total,
+        mcqs_passed=attempt.mcqs_passed,
+        output=attempt.output,
+        error=stderr,
+        feedback=attempt.feedback,
+        submitted_at=attempt.attempted_at,
+        test_cases=challenge.test_cases or [],
+        mcqs=challenge.mcqs or [],
+    )

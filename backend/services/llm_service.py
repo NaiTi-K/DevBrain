@@ -24,7 +24,7 @@ _DEFAULT_SYSTEM = (
 _MIN_CALL_INTERVAL = 1.0
 _DEFAULT_MAX_RETRIES = 3
 # Never block an HTTP request longer than this waiting on Groq 429
-_MAX_RETRY_WAIT_SEC = 8.0
+_MAX_RETRY_WAIT_SEC = 60.0
 
 
 class GroqRateLimitError(Exception):
@@ -51,10 +51,13 @@ class LLMService:
     async def _throttle(self) -> None:
         remaining = self.seconds_until_available()
         if remaining > 0:
-            raise GroqRateLimitError(
-                retry_after=remaining,
-                message=f"Groq cooldown active — retry in {int(remaining)}s",
-            )
+            if remaining <= _MAX_RETRY_WAIT_SEC:
+                await asyncio.sleep(remaining)
+            else:
+                raise GroqRateLimitError(
+                    retry_after=remaining,
+                    message=f"Groq cooldown active — retry in {int(remaining)}s",
+                )
         async with self._lock:
             elapsed = time.monotonic() - self._last_call_at
             if elapsed < _MIN_CALL_INTERVAL:

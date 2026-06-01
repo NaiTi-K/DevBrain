@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { generateChallenge, submitChallenge, getChallengeHistory } from "@/lib/api";
+import { generateChallenge, submitChallenge, getChallengeHistory, getAttemptDetails } from "@/lib/api";
 import type { Challenge } from "@/lib/types";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -120,10 +120,10 @@ function VerdictPanel({ verdict, testCases }: { verdict: Verdict, testCases?: an
             </div>
           )}
 
-          {tr.status === "WA" && (
+          {(tr.status === "WA" || tr.status === "AC") && (
             <div className="text-xs mt-1 font-mono space-y-1 bg-black/20 p-2 rounded">
               <div><span className="text-gray-500">Expected: </span><span className="text-green-400">{tr.expected}</span></div>
-              <div><span className="text-gray-500">Got:      </span><span className="text-red-400">{tr.stdout}</span></div>
+              <div><span className="text-gray-500">Got:      </span><span className={tr.status === "AC" ? "text-green-400" : "text-red-400"}>{tr.stdout}</span></div>
             </div>
           )}
         </div>
@@ -145,6 +145,21 @@ export default function ChallengesPage() {
   const [activeStep, setActiveStep] = useState<"code" | "mcq">("code");
   const [language, setLanguage] = useState<string>("python");
   const [error, setError] = useState<string | null>(null);
+  const [selectedAttempt, setSelectedAttempt] = useState<any | null>(null);
+  const [attemptDetailsLoading, setAttemptDetailsLoading] = useState(false);
+  const [mcqsSubmitted, setMcqsSubmitted] = useState(false);
+
+  const handleHistoryRowClick = async (attemptId: string) => {
+    setAttemptDetailsLoading(true);
+    try {
+      const details = await getAttemptDetails(attemptId);
+      setSelectedAttempt(details);
+    } catch (e: any) {
+      alert("Failed to load attempt details: " + (e?.message ?? String(e)));
+    } finally {
+      setAttemptDetailsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!localStorage.getItem("devbrain_token")) {
@@ -173,6 +188,7 @@ export default function ChallengesPage() {
       setGenerating(false);
       setMcqAnswers({});
       setActiveStep("code");
+      setMcqsSubmitted(false);
     }
   };
 
@@ -185,10 +201,15 @@ export default function ChallengesPage() {
       const answersArray = isMcqStep ? (challenge.mcqs?.map((_: any, i: number) => mcqAnswers[i] ?? -1) ?? []) : [];
       const r = await submitChallenge(challenge.id, code, language, answersArray);
       
+      // Always set result so user can see compiler output / test feedback immediately
+      setResult(r);
+      
+      if (isMcqStep) {
+        setMcqsSubmitted(true);
+      }
+      
       if (r.passed && !isMcqStep && challenge.mcqs?.length > 0) {
         setActiveStep("mcq");
-      } else {
-        setResult(r);
       }
       
       const h = await getChallengeHistory().catch(() => []);
@@ -318,7 +339,12 @@ export default function ChallengesPage() {
                         )}
                         <p>
                           <span className="text-gray-500">Input: </span>
-                          <span className="text-gray-300">{(tc.input || "").length > 100 ? tc.input.substring(0, 100) + "..." : tc.input}</span>
+                          <span className="text-gray-300">
+                            {(() => {
+                              const str = typeof tc.input === "object" ? JSON.stringify(tc.input) : String(tc.input || "");
+                              return str.length > 100 ? str.substring(0, 100) + "..." : str;
+                            })()}
+                          </span>
                         </p>
                         <p>
                           <span className="text-gray-500">Expected: </span>
@@ -459,22 +485,27 @@ export default function ChallengesPage() {
               </>
             ) : (
               <div className="flex-1 bg-[#1a1d2e] border border-[#2d3148] rounded-xl overflow-hidden shadow-[0_0_15px_rgba(236,72,153,0.1)] flex flex-col">
-                <div className="bg-[#2d3148]/30 px-6 py-4 flex items-center justify-between border-b border-[#2d3148]">
+              <div className="bg-[#2d3148]/30 px-6 py-4 flex items-center justify-between border-b border-[#2d3148]">
+                <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <span className="text-2xl">🧠</span> Knowledge Check
                   </h2>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting || result != null}
-                    className="flex items-center gap-2 bg-[#ec4899] hover:bg-[#db2777] text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(236,72,153,0.3)]"
-                  >
-                    {submitting ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      "Submit Answers"
-                    )}
-                  </button>
+                  <p className="text-xs text-pink-400 mt-1">
+                    ⚡ Each question carries equal weightage towards theoretical correctness.
+                  </p>
                 </div>
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || mcqsSubmitted}
+                  className="flex items-center gap-2 bg-[#ec4899] hover:bg-[#db2777] text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(236,72,153,0.3)]"
+                >
+                  {submitting ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    "Submit Answers"
+                  )}
+                </button>
+              </div>
                 <div className="p-8 space-y-8 overflow-y-auto">
                   {challenge.mcqs?.map((mcq: any, i: number) => (
                     <div key={i} className="bg-[#0f1117] rounded-xl p-6 border border-[#2d3148]">
@@ -491,7 +522,7 @@ export default function ChallengesPage() {
                                 ? "bg-[#ec489911] border-[#ec489955]"
                                 : "bg-[#1a1d2e] border-[#2d3148] hover:border-gray-500"
                             } ${
-                              result
+                              mcqsSubmitted
                                 ? optIdx === mcq.correct_index
                                   ? "bg-[#22c55e11] border-[#22c55e55]"
                                   : mcqAnswers[i] === optIdx
@@ -504,17 +535,17 @@ export default function ChallengesPage() {
                               type="radio"
                               name={`mcq-${i}`}
                               checked={mcqAnswers[i] === optIdx}
-                              onChange={() => !result && setMcqAnswers(prev => ({ ...prev, [i]: optIdx }))}
-                              disabled={!!result}
+                              onChange={() => !mcqsSubmitted && setMcqAnswers(prev => ({ ...prev, [i]: optIdx }))}
+                              disabled={mcqsSubmitted}
                               className="mt-0.5 text-[#ec4899] focus:ring-[#ec4899] bg-transparent border-gray-600"
                             />
-                            <span className={`text-sm ${result && optIdx === mcq.correct_index ? "text-[#22c55e] font-semibold" : "text-gray-300"}`}>
+                            <span className={`text-sm ${mcqsSubmitted && optIdx === mcq.correct_index ? "text-[#22c55e] font-semibold" : "text-gray-300"}`}>
                               {opt}
                             </span>
                           </label>
                         ))}
                       </div>
-                      {result && mcq.explanation && (
+                      {mcqsSubmitted && mcq.explanation && (
                         <div className="mt-4 p-4 bg-[#2d3148]/20 border-l-4 border-[#6366f1] rounded-r-lg">
                           <p className="text-sm text-gray-300">
                             <span className="font-semibold text-[#6366f1] mr-2">Explanation:</span>
@@ -582,7 +613,9 @@ export default function ChallengesPage() {
                   {history.slice(0, 10).map((entry) => (
                     <tr
                       key={entry.id}
-                      className="border-b border-[#2d3148] last:border-0 hover:bg-[#2d3148]/20 transition-colors"
+                      onClick={() => handleHistoryRowClick(entry.id)}
+                      className="border-b border-[#2d3148] last:border-0 hover:bg-[#2d3148]/20 transition-colors cursor-pointer"
+                      title="Click to view detailed submission history"
                     >
                       <td className="px-5 py-3 text-gray-300">{entry.title}</td>
                       <td className="px-5 py-3 text-gray-400 capitalize">
@@ -611,6 +644,177 @@ export default function ChallengesPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Loading Overlay for Fetching Attempt Details ── */}
+      {attemptDetailsLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all">
+          <div className="flex flex-col items-center gap-4 bg-[#111322] border border-[#2d3148] px-8 py-6 rounded-2xl shadow-2xl">
+            <div className="w-10 h-10 border-4 border-[#6366f1]/20 border-t-[#6366f1] rounded-full animate-spin" />
+            <span className="text-sm font-semibold text-gray-300">Fetching submission details…</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── LeetCode-style Attempt Details Modal ── */}
+      {selectedAttempt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md transition-all duration-300">
+          <div className="bg-[#111322] border border-[#2d3148] w-full max-w-6xl h-[85vh] rounded-2xl flex flex-col overflow-hidden shadow-[0_0_50px_rgba(99,102,241,0.25)] animate-in fade-in zoom-in duration-200">
+            
+            {/* Header */}
+            <div className="px-6 py-4 bg-[#1a1d2e] border-b border-[#2d3148] flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h3 className="text-xl font-bold text-white tracking-tight">
+                    {selectedAttempt.challenge_title}
+                  </h3>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${
+                    selectedAttempt.challenge_difficulty?.toLowerCase() === 'easy' ? 'bg-[#22c55e22] text-[#22c55e]' :
+                    selectedAttempt.challenge_difficulty?.toLowerCase() === 'hard' ? 'bg-[#ef444422] text-[#ef4444]' :
+                    'bg-[#f59e0b22] text-[#f59e0b]'
+                  }`}>
+                    {selectedAttempt.challenge_difficulty}
+                  </span>
+                  <span className="text-xs text-gray-400 bg-[#2d3148] px-2.5 py-1 rounded-md font-mono">
+                    {selectedAttempt.challenge_topic}
+                  </span>
+                </div>
+                <p className="text-gray-400 text-xs mt-1">
+                  Submitted on {new Date(selectedAttempt.submitted_at).toLocaleString()} via <span className="font-semibold text-[#6366f1] uppercase">{selectedAttempt.language}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedAttempt(null)}
+                className="p-2 hover:bg-[#2d3148] rounded-lg text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content Layout */}
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+              
+              {/* Left Panel: Description & MCQs */}
+              <div className="w-full md:w-1/2 p-6 border-r border-[#2d3148] overflow-y-auto space-y-6">
+                <div>
+                  <h4 className="text-white font-bold text-xs uppercase tracking-widest text-gray-400 mb-2">Problem Description</h4>
+                  <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-4 text-gray-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                    {selectedAttempt.challenge_description}
+                  </div>
+                </div>
+
+                {/* MCQs section in Attempt Details */}
+                {selectedAttempt.mcqs && selectedAttempt.mcqs.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-[#2d3148] pb-2">
+                      <h4 className="text-white font-bold text-xs uppercase tracking-widest text-gray-400">Knowledge Check MCQs</h4>
+                      <span className="text-xs font-semibold text-pink-400 bg-pink-400/10 px-3 py-1 rounded-full">
+                        {selectedAttempt.mcqs_passed} / {selectedAttempt.mcqs.length} Correct
+                      </span>
+                    </div>
+                    <div className="space-y-4">
+                       {selectedAttempt.mcqs.map((mcq: any, i: number) => (
+                         <div key={i} className="bg-[#0f1117] rounded-xl p-5 border border-[#2d3148] space-y-3">
+                           <p className="text-gray-200 text-sm font-medium leading-relaxed font-sans">
+                             <span className="text-[#ec4899] font-bold mr-1">Q{i + 1}.</span> {mcq.question}
+                           </p>
+                           <div className="grid grid-cols-1 gap-2">
+                             {mcq.options?.map((opt: string, optIdx: number) => (
+                               <div
+                                 key={optIdx}
+                                 className={`p-3 rounded-lg border text-xs text-gray-300 flex items-center justify-between ${
+                                   optIdx === mcq.correct_index
+                                     ? "bg-[#22c55e11] border-[#22c55e44] text-[#22c55e] font-semibold"
+                                     : "bg-[#1a1d2e]/50 border-[#2d3148]"
+                                 }`}
+                               >
+                                 <span>{opt}</span>
+                                 {optIdx === mcq.correct_index && (
+                                   <span className="text-[#22c55e] text-[10px] font-bold uppercase tracking-wider bg-[#22c55e22] px-2 py-0.5 rounded">Correct Answer</span>
+                                 )}
+                               </div>
+                             ))}
+                           </div>
+                           {mcq.explanation && (
+                             <div className="mt-3 p-3 bg-[#2d3148]/20 border-l-4 border-[#6366f1] rounded-r-lg text-xs text-gray-300 leading-relaxed font-sans">
+                               <span className="font-semibold text-[#6366f1] mr-1">Explanation:</span>
+                               {mcq.explanation}
+                             </div>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Panel: Submitted Code & Outcomes */}
+              <div className="w-full md:w-1/2 p-6 overflow-y-auto space-y-6 bg-[#0c0d17]">
+                
+                {/* Submitted Code */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-white font-bold text-xs uppercase tracking-widest text-gray-400">Submitted Code</h4>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedAttempt.code);
+                        alert("Code copied to clipboard!");
+                      }}
+                      className="text-xs text-[#6366f1] hover:text-[#5558e3] hover:underline font-semibold transition-colors"
+                    >
+                      Copy Code
+                    </button>
+                  </div>
+                  <pre className="p-4 bg-[#141625] border border-[#2d3148] rounded-xl text-xs font-mono text-gray-200 overflow-x-auto whitespace-pre leading-relaxed select-text max-h-[300px]">
+                    {selectedAttempt.code}
+                  </pre>
+                </div>
+
+                {/* Outcome Indicators */}
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-4">
+                     <p className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">Verdict</p>
+                     <p className={`text-base font-bold mt-1 ${selectedAttempt.passed ? 'text-[#22c55e]' : 'text-[#ef4444]'}`}>
+                       {selectedAttempt.passed ? 'Accepted' : 'Failed'}
+                     </p>
+                   </div>
+                   <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-4">
+                     <p className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">Test Cases Passed</p>
+                     <p className="text-base font-bold text-white mt-1">
+                       {selectedAttempt.tests_passed} / {selectedAttempt.tests_total}
+                     </p>
+                   </div>
+                </div>
+
+                {/* Test Case Execution Output */}
+                {selectedAttempt.output && (
+                  <div>
+                    <h4 className="text-white font-bold text-xs uppercase tracking-widest text-gray-400 mb-2">Test Case Executions</h4>
+                    <div className="space-y-3">
+                      <VerdictPanel
+                        verdict={(() => {
+                          try { return JSON.parse(selectedAttempt.output); } catch { return null; }
+                        })()}
+                        testCases={selectedAttempt.test_cases}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Grok Feedback */}
+                {selectedAttempt.feedback && (
+                  <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-5 space-y-2">
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest font-sans">Grok AI Code Review</p>
+                    <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">{selectedAttempt.feedback}</p>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
         </div>
       )}
     </div>
