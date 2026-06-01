@@ -395,10 +395,30 @@ export async function searchResources(
 
 /** Start a new interview session. */
 export async function startInterview(
-  mode: "dsa" | "system_design",
+  mode: "dsa" | "resume",
+  resumeFile?: File | null
 ): Promise<any> {
-  const body: StartInterviewRequest = { mode };
-  const res = await apiRequest<any>("POST", "/interview/start", body);
+  const formData = new FormData();
+  formData.append("mode", mode);
+  if (resumeFile) {
+    formData.append("resumeFile", resumeFile);
+  }
+
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(`${BASE_URL}/interview/start`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new ApiError(response.status, "Failed to start interview");
+  }
+  
+  const res = await response.json();
   if (!res) return null;
   return {
     ...res,
@@ -417,6 +437,13 @@ export async function sendInterviewMessage(
     `/interview/${session_id}/message`,
     { message },
   );
+}
+
+/** Get interview history. */
+export async function getInterviewHistory(): Promise<any[]> {
+  const items = await apiRequest<any[]>("GET", "/interview/history");
+  if (!items) return [];
+  return items;
 }
 
 // ---------------------------------------------------------------------------

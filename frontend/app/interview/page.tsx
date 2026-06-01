@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { startInterview, sendInterviewMessage } from "@/lib/api";
+import { startInterview, sendInterviewMessage, getInterviewHistory } from "@/lib/api";
 import type { InterviewSession } from "@/lib/types";
 
 const ChatInterface = dynamic(() => import("@/components/ChatInterface"), {
   ssr: false,
 });
 
-type Mode = "dsa" | "system_design";
+type Mode = "dsa" | "resume";
 
 type Message = {
   role: "user" | "assistant";
@@ -32,10 +32,10 @@ const MODES: { value: Mode; label: string; icon: string; desc: string }[] = [
     desc: "Data structures, algorithms, time/space complexity. LeetCode-style questions with guided hints.",
   },
   {
-    value: "system_design",
-    label: "System Design",
-    icon: "🏗️",
-    desc: "Design scalable systems from scratch. Cover tradeoffs, databases, caching, and architecture patterns.",
+    value: "resume",
+    label: "Resume Interview",
+    icon: "📄",
+    desc: "Upload your resume (PDF) and get a personalized technical interview based on your projects.",
   },
 ];
 
@@ -91,7 +91,7 @@ function ScoreCircle({ score }: { score: number }) {
         transform="rotate(-90 55 55)"
       />
       <text x="55" y="60" textAnchor="middle" fill="white" fontSize="22" fontWeight="800">
-        {score}
+        {Number(score).toFixed(1)}
       </text>
       <text x="55" y="74" textAnchor="middle" fill="#6b7280" fontSize="10">
         / 10
@@ -103,6 +103,7 @@ function ScoreCircle({ score }: { score: number }) {
 export default function InterviewPage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("dsa");
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -110,9 +111,14 @@ export default function InterviewPage() {
   const [report, setReport] = useState<ReportCard | null>(null);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!localStorage.getItem("devbrain_token")) router.push("/");
+    if (!localStorage.getItem("devbrain_token")) {
+      router.push("/");
+      return;
+    }
+    getInterviewHistory().then(setHistory).catch(console.error);
   }, [router]);
 
   const handleStart = async () => {
@@ -122,7 +128,7 @@ export default function InterviewPage() {
     setSessionComplete(false);
     setError(null);
     try {
-      const s = await startInterview(mode);
+      const s = await startInterview(mode, resumeFile);
       setSession(s);
       if (s.opening_message) {
         setMessages([{ role: "assistant", content: s.opening_message }]);
@@ -164,6 +170,7 @@ export default function InterviewPage() {
     setMessages([]);
     setReport(null);
     setSessionComplete(false);
+    setResumeFile(null);
   };
 
   return (
@@ -173,7 +180,7 @@ export default function InterviewPage() {
           Mock Interview
         </h1>
         <p className="text-gray-400 text-sm mt-1">
-          Adaptive AI interviewer — practice DSA or system design
+          Adaptive AI interviewer — practice DSA or get interviewed on your resume
         </p>
       </div>
 
@@ -210,22 +217,10 @@ export default function InterviewPage() {
                     "Code walkthrough and edge case probing",
                   ]
                 : [
-                    "Open-ended system design question",
-                    "Guided discussion on requirements, scale, and tradeoffs",
-                    "Deep dive into specific components",
-                    "Architecture diagram discussion",
-                  ].map((item, i) => (
-                    <li key={i} className="text-gray-300 text-sm flex gap-2">
-                      <span className="text-[#6366f1]">•</span>
-                      {item}
-                    </li>
-                  ))}
-              {mode === "dsa" &&
-                [
-                    "2–3 algorithmic problems of increasing difficulty",
-                    "Real-time hints if you get stuck",
-                    "Time & space complexity discussion",
-                    "Code walkthrough and edge case probing",
+                    "1 behavioral question to kick off",
+                    "Deep dive into your uploaded resume projects",
+                    "Questions adapt based on your answers",
+                    "Lenient evaluation on soft skills and tech concepts",
                   ].map((item, i) => (
                     <li key={i} className="text-gray-300 text-sm flex gap-2">
                       <span className="text-[#6366f1]">•</span>
@@ -233,11 +228,23 @@ export default function InterviewPage() {
                     </li>
                   ))}
             </ul>
+            
+            {mode === "resume" && (
+              <div className="mt-4 border-t border-[#2d3148] pt-4">
+                <label className="block text-white font-medium mb-2 text-sm">Upload Resume (PDF)</label>
+                <input 
+                  type="file" 
+                  accept="application/pdf"
+                  onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#6366f1]/10 file:text-[#6366f1] hover:file:bg-[#6366f1]/20 cursor-pointer transition-all"
+                />
+              </div>
+            )}
           </div>
 
           <button
             onClick={handleStart}
-            disabled={starting}
+            disabled={starting || (mode === "resume" && !resumeFile)}
             className="px-8 py-3 bg-[#6366f1] hover:bg-[#5558e3] text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2 text-base"
           >
             {starting ? (
@@ -246,9 +253,32 @@ export default function InterviewPage() {
                 Starting session…
               </>
             ) : (
-              `Start ${mode === "dsa" ? "DSA" : "System Design"} Interview →`
+              `Start ${mode === "dsa" ? "DSA" : "Resume"} Interview →`
             )}
           </button>
+          
+          {/* ── Interview History ── */}
+          {history.length > 0 && (
+            <div className="mt-12">
+              <h2 className="text-white font-semibold mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#6366f1]" />
+                Previous Interviews
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {history.filter(h => h.completed).map((h, i) => (
+                  <div key={i} className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-4 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[#6366f1] text-xs font-semibold uppercase tracking-widest">{h.mode === "dsa" ? "DSA" : "Resume"}</span>
+                      {h.overall_score !== null && (
+                        <span className="text-[#22c55e] text-sm font-bold">{Number(h.overall_score).toFixed(1)}/10</span>
+                      )}
+                    </div>
+                    <p className="text-gray-400 text-xs">{new Date(h.created_at).toLocaleDateString()}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* ── Active session ── */
@@ -261,7 +291,7 @@ export default function InterviewPage() {
                 }`}
               />
               <span className="text-white text-sm font-medium">
-                {mode === "dsa" ? "DSA" : "System Design"} Interview
+                {mode === "dsa" ? "DSA" : "Resume"} Interview
               </span>
               {sessionComplete && (
                 <span className="text-xs text-[#22c55e] font-semibold">
@@ -275,15 +305,6 @@ export default function InterviewPage() {
             >
               New Session
             </button>
-          </div>
-
-          <div className="h-[480px]">
-            <ChatInterface
-              messages={messages}
-              onSend={handleSend}
-              isLoading={isLoading}
-              sessionComplete={sessionComplete}
-            />
           </div>
 
           {/* ── Report card ── */}
@@ -355,6 +376,15 @@ export default function InterviewPage() {
               </button>
             </div>
           )}
+
+          <div className="h-[480px]">
+            <ChatInterface
+              messages={messages}
+              onSend={handleSend}
+              isLoading={isLoading}
+              sessionComplete={sessionComplete}
+            />
+          </div>
         </div>
       )}
     </div>

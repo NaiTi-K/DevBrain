@@ -12,13 +12,16 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+import io
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status, Form, File, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
+from sqlalchemy.orm.attributes import flag_modified
+import PyPDF2
 
 from core.dependencies import get_current_user, get_db
 from models.interview import InterviewSession
@@ -32,12 +35,6 @@ router = APIRouter(tags=["interview"])
 # ─────────────────────────────────────────────────────────────────────────────
 # Request / response schemas
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-class StartInterviewRequest(BaseModel):
-    mode: Literal["dsa", "system_design"] = Field(
-        ..., description="Interview mode: 'dsa' for coding problems, 'system_design' for architecture."
-    )
 
 
 class StartInterviewResponse(BaseModel):
@@ -158,15 +155,30 @@ async def _get_session_or_404(
     summary="Start a new interview session and receive the first question",
 )
 async def start_interview(
-    body: StartInterviewRequest,
+    mode: str = Form(...),
+    resumeFile: UploadFile | None = File(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StartInterviewResponse:
     """
     Creates a new InterviewSession in PostgreSQL, runs interview_agent_node
     with an empty history to generate the first question, then persists
-    the updated state.
+    the updated state. Optionally extracts text from a PDF resume.
     """
+    if resumeFile:
+        try:
+            content = await resumeFile.read()
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+            extracted_text = ""
+            for page in pdf_reader.pages:
+                extracted_text += page.extract_text() + "\n"
+            current_user.resume_text = extracted_text
+            db.add(current_user)
+            await db.commit()
+            await db.refresh(current_user)
+        except Exception as e:
+            logger.error("Failed to parse resume: %s", e)
+
     session_id = str(uuid.uuid4())
     skill_profile = _extract_skill_profile(current_user)
 
@@ -174,7 +186,7 @@ async def start_interview(
         user=current_user,
         user_input="",
         structured_output={
-            "mode": body.mode,
+            "mode": mode,
             "skill_profile": skill_profile,
             "used_topics": [],
             "current_question": {},
@@ -207,7 +219,7 @@ async def start_interview(
         db_session = InterviewSession(
             id=session_id,
             user_id=str(current_user.id),
-            mode=body.mode,
+            mode=mode,
             conversation_history=updated_history,
             structured_output=updated_structured,
             overall_score=None,
@@ -229,7 +241,7 @@ async def start_interview(
     return StartInterviewResponse(
         session_id=session_id,
         first_question=first_question,
-        mode=body.mode,
+        mode=mode,
     )
 
 
@@ -310,6 +322,10 @@ async def send_message(
         db_session.updated_at = datetime.utcnow()
         if session_complete:
             db_session.completed_at = datetime.utcnow()
+            
+        flag_modified(db_session, "messages")
+        flag_modified(db_session, "topics_covered")
+        
         await db.commit()
     except Exception as exc:
         logger.error("Failed to update interview session %s: %s", session_id, exc)
