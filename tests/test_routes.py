@@ -93,6 +93,8 @@ class TestGitHubRoutes:
         mock_route_cache.increment = AsyncMock(return_value=1)
         mock_agent_cache.get_skill_profile = AsyncMock(return_value=None)
         mock_agent_cache.set_skill_profile = AsyncMock(return_value=True)
+        mock_agent_cache.delete_skill_profile = AsyncMock(return_value=True)
+        mock_agent_cache.delete_progress_dashboard = AsyncMock(return_value=True)
         mock_github.analyze_skill_profile = AsyncMock(
             return_value={
                 "skills": {"Python": 0.80, "Shell": 0.25},

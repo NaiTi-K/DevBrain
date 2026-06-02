@@ -6,12 +6,12 @@ from typing import Dict, Any
 async def run_linter(code: str, language: str) -> Dict[str, Any]:
     if language.lower() not in ["python", "py"]:
         return {"warnings": [], "error": "Linter only supported for Python right now"}
-    
+
     # Write code to a temp file
     with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
         f.write(code)
         temp_path = f.name
-        
+
     try:
         # Run flake8
         process = await asyncio.create_subprocess_exec(
@@ -20,7 +20,7 @@ async def run_linter(code: str, language: str) -> Dict[str, Any]:
             stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await process.communicate()
-        
+
         output = stdout.decode('utf-8')
         warnings = []
         for line in output.splitlines():
@@ -36,7 +36,7 @@ async def run_linter(code: str, language: str) -> Dict[str, Any]:
                 })
             else:
                 warnings.append({"message": line})
-                
+
         return {"warnings": warnings, "error": None}
     except Exception as e:
         return {"warnings": [], "error": f"Linter failed: {str(e)}"}

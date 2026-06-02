@@ -35,7 +35,7 @@ def validate_and_fix_challenge(parsed: dict) -> None:
     """Raises ValueError if invalid, and auto-fixes structural anomalies from LLMs."""
     if not parsed:
         raise ValueError("Empty response.")
-    
+
     schema = parsed.get("schema", {})
     if not schema:
         raise ValueError("Missing 'schema' object in challenge.")
@@ -49,7 +49,7 @@ def validate_and_fix_challenge(parsed: dict) -> None:
         if isinstance(ptype, dict):
             ptype = ptype.get("type") or (list(ptype.values())[0] if ptype.values() else None)
             p["type"] = ptype
-            
+
         if not isinstance(ptype, str) or ptype not in VALID_TYPES:
             raise ValueError(
                 f"Unsupported type '{ptype}' in schema.params. "
@@ -74,14 +74,14 @@ def validate_and_fix_challenge(parsed: dict) -> None:
     test_cases = parsed.get("test_cases", [])
     if not isinstance(test_cases, list) or not test_cases:
         raise ValueError("test_cases must be a non-empty list.")
-    
+
     first_param_name = params[0]["name"]
     for tc in test_cases:
         if "input" not in tc:
             raise ValueError("Every test case must have an 'input' field.")
         if "expected" not in tc:
             raise ValueError("Every test case must have an 'expected' field.")
-        
+
         # If the LLM provided a raw value instead of a dictionary mapping param names to values:
         if not isinstance(tc["input"], dict):
             tc["input"] = {first_param_name: tc["input"]}
@@ -142,7 +142,7 @@ async def challenge_agent_node(state: dict) -> dict:
         from services.search_service import search_service
         search_query = f"leetcode exact problem description constraints test cases {topic} {difficulty}"
         search_results = await search_service.search(search_query, max_results=3, search_depth="advanced")
-        
+
         search_context = ""
         if search_results:
             search_context = "\n\n".join(
@@ -154,17 +154,17 @@ async def challenge_agent_node(state: dict) -> dict:
 
         challenge_dict = None
         parsed: Optional[dict] = None
-        
+
         for attempt in range(4):
             if parsed is None:
                 temp = 0.8 + (attempt * 0.05)
                 raw: str = await llm.structured_call(prompt, temperature=temp)
                 parsed = _parse_json_safe(raw)
-                
+
             if not parsed or "title" not in parsed:
                 parsed = None
                 continue
-            
+
             try:
                 validate_and_fix_challenge(parsed)
             except ValueError as e:
@@ -187,24 +187,22 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
                 except Exception:
                     parsed = None
                     continue
-            
+
             # Verify solution against test cases
             solutions = parsed.get("solutions", {})
             solution_raw = solutions.get("python") or parsed.get("solution", "")
             solution_code = (solution_raw.get("python", str(solution_raw)) if isinstance(solution_raw, dict) else str(solution_raw)).replace("\\n", "\n")
-            
-            starter_raw = parsed.get("starter_code", "")
-            starter_code = (starter_raw.get("python", str(starter_raw)) if isinstance(starter_raw, dict) else str(starter_raw)).replace("\\n", "\n")
+
             test_cases = parsed.get("test_cases", [])
-            
+
             if not solution_code or not test_cases:
                 continue
-                
+
             from services.sandbox_service import run_code
             import asyncio
-            
+
             schema = parsed.get("schema", {})
-            
+
             # 1. Run Python Reference Solution to align test case expected outputs
             eval_result = await asyncio.to_thread(
                 run_code, "python", solution_code, schema, test_cases, schema.get("judge", "exact")
@@ -222,7 +220,7 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
                     tc = test_cases[idx].copy()
                     tc["expected"] = stdout
                     updated_test_cases.append(tc)
-                
+
                 if valid and updated_test_cases:
                     parsed["test_cases"] = updated_test_cases
                     logger.info("Automatically aligned test case expected outputs with reference solution outputs.")
@@ -233,7 +231,7 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
             # 2. Run Tri-Language Verification concurrently for C++ and Java (if provided)
             cpp_sol = solutions.get("cpp")
             java_sol = solutions.get("java")
-            
+
             verification_tasks = []
             if cpp_sol:
                 logger.info("Verifying C++ solution in sandbox...")
@@ -245,7 +243,7 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
                 verification_tasks.append(
                     asyncio.to_thread(run_code, "java", java_sol, schema, parsed["test_cases"], schema.get("judge", "exact"))
                 )
-                
+
             if verification_tasks:
                 verification_results = await asyncio.gather(*verification_tasks)
                 task_idx = 0
@@ -269,7 +267,7 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
                         if r.get("status") != "AC":
                             failed_cases.append(f"Case {r.get('case')}: Expected {r.get('expected')}, but got {r.get('stdout')}")
                     err_msg = "Failed cases:\n" + "\n".join(failed_cases) if failed_cases else "Some test cases failed."
-                
+
                 correction_prompt = f"""Your previous generated challenge failed validation or test execution!
 Error/Failures:
 {err_msg}
@@ -298,7 +296,7 @@ Ensure the solution code is correct, and all test cases accurately match the exp
                 except Exception:
                     parsed = None
                 continue
-                
+
             challenge_dict = parsed
             break
 
@@ -315,7 +313,7 @@ Ensure the solution code is correct, and all test cases accurately match the exp
         async with async_session() as session:
             solution_val = challenge_dict.get("solution", "")
             solution_str = (solution_val.get("python", str(solution_val)) if isinstance(solution_val, dict) else str(solution_val)).replace("\\n", "\n")
-            
+
             challenge = Challenge(
                 id=uuid.uuid4(),
                 user_id=uuid.UUID(user_id),
@@ -383,9 +381,8 @@ def _find_weakest_coding_skill(skills: dict[str, float], last_topic: str = "") -
     return skill, coding_skills[skill]
 
 def _difficulty_from_score(score: float) -> str:
-    if score <= 0.40:
-        return "medium"
-    return "hard"
+    import random
+    return random.choice(["medium", "hard"])
 
 
 

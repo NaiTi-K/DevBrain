@@ -64,10 +64,10 @@ async def code_review_node(state: DevBrainState) -> DevBrainState:
     ast_facts = {"error": "Only supported for Python"}
     if language.lower() in ("python", "py"):
         ast_facts = analyze_code(code)
-    
+
     # 2. Linter
     lint_facts = await run_linter(code, language)
-    
+
     prompt = REVIEW_PROMPT.format(
         language=language,
         code=code,
@@ -92,7 +92,7 @@ async def code_review_node(state: DevBrainState) -> DevBrainState:
 
     state["structured_output"] = review_dict
     state["agent_output"] = json.dumps(review_dict)
-    
+
     return state
 
 async def reflection_node(state: DevBrainState) -> DevBrainState:
@@ -101,37 +101,37 @@ async def reflection_node(state: DevBrainState) -> DevBrainState:
     language = review_dict.get("language", "python")
     original_code = review_dict.get("code", "")
     improvements = review_dict.get("improvements", [])
-    
+
     for imp in improvements:
         code_after = imp.get("code_after")
         if not code_after:
             continue
-            
+
         # 1. Syntax check
         syntax_res = await check_syntax(code_after, language)
         if not syntax_res["ok"]:
             imp["verification"] = {"verified": False, "badge": "⛔ SYNTAX ERROR", "message": syntax_res["error"]}
             continue
-            
+
         # 2. Benchmark
         orig_bench = await benchmark_code(original_code, language)
         imp_bench = await benchmark_code(code_after, language)
-        
+
         if orig_bench["ok"] and imp_bench["ok"] and imp_bench["median_ms"] > 0:
             speedup = orig_bench["median_ms"] / imp_bench["median_ms"]
             imp["verification"] = {
-                "verified": True, 
-                "badge": "✅ VERIFIED", 
+                "verified": True,
+                "badge": "✅ VERIFIED",
                 "message": f"Compiled successfully. {speedup:.1f}x speedup vs original.",
                 "speedup": speedup
             }
         else:
             imp["verification"] = {
-                "verified": True, 
-                "badge": "✅ COMPILES", 
+                "verified": True,
+                "badge": "✅ COMPILES",
                 "message": "Syntax valid, but benchmarking failed or timed out."
             }
-            
+
     state["structured_output"] = review_dict
     state["agent_output"] = json.dumps(review_dict)
     return state

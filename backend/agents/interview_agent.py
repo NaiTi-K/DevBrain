@@ -38,11 +38,11 @@ async def _generate_scorecard(scores: dict, history: list, final_feedback: str, 
     agent_output = f"{final_feedback}\n\n### Interview Complete\n\n**Average Score:** {total:.1f}/10\n\n**Scorecard:**\n"
     for k, v in scores.items():
         agent_output += f"- {k}: {v}/10\n"
-    
+
     prompt = f"Write an honest 3-sentence debrief based on these scores: {scores}. JSON: {{\"debrief\": \"...\"}}"
     res = await llm.structured_call(prompt)
     agent_output += f"\n**Debrief:**\n{res.get('debrief')}"
-    
+
     structured["session_complete"] = True
     structured["final_report"] = {
         "overall_score": total,
@@ -77,7 +77,7 @@ async def interview_agent_node(state: DevBrainState) -> DevBrainState:
 
     if phase == PHASE_RESUME:
         turn_count = structured.get("resume_turn", 0)
-        
+
         if turn_count == 0:
             prompt = f"Resume:\n{resume}\n\nGenerate ONE challenging but fair behavioral interview question to start the interview. Return ONLY a JSON object: {{\"question\": \"...\"}}"
             res = await llm.structured_call(prompt, "You are a lenient Interviewer.")
@@ -101,7 +101,7 @@ async def interview_agent_node(state: DevBrainState) -> DevBrainState:
     elif phase == PHASE_DSA:
         turn_count = structured.get("dsa_turn", 0)
         difficulty = structured.get("dsa_difficulty", "Hard")
-        
+
         if turn_count == 0:
             structured["dsa_difficulty"] = "Hard"
             prompt = "Generate ONE challenging (Hard difficulty) Data Structures and Algorithms (DSA) question. Do not ask for system design or behavioral. Return JSON: {\"question\": \"...\", \"topic\": \"...\"}"
@@ -130,13 +130,13 @@ async def interview_agent_node(state: DevBrainState) -> DevBrainState:
 
     structured["phase"] = next_phase
     structured["scores"] = scores
-    
+
     state["structured_output"] = structured
     state["agent_output"] = agent_output
-    
+
     if agent_output:
         history.append({"role": "agent", "content": agent_output})
-    
+
     state["conversation_history"] = history
 
     return state

@@ -240,7 +240,7 @@ async def submit_challenge(
     # Note: If challenge.schema is missing on old challenges, fallback to default schema
     schema = challenge.schema or {"params": [], "returns": "int"}
     eval_result = await asyncio.to_thread(run_code, body.language, body.code, schema, challenge.test_cases, challenge.judge)
-    
+
     tests_total = len(eval_result["test_results"])
     tests_passed = sum(1 for tr in eval_result["test_results"] if tr["status"] == "AC")
     passed = eval_result["status"] == "AC"
@@ -253,20 +253,47 @@ async def submit_challenge(
                 mcqs_passed += 1
 
     # ── Save attempt ──────────────────────────────────────────────────────
-    attempt = ChallengeAttempt(
-        id=uuid.uuid4(),
-        user_id=current_user.id,
-        challenge_id=cid,
-        submitted_code=body.code,
-        language=body.language,
-        output=json.dumps(eval_result),
-        tests_passed=tests_passed,
-        tests_total=tests_total,
-        mcqs_passed=mcqs_passed,
-        passed=passed,
-        submitted_at=datetime.now(timezone.utc),
+    # Avoid duplicating rows: Update existing attempt for this challenge by this user today
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    result = await db.execute(
+        select(ChallengeAttempt)
+        .where(
+            ChallengeAttempt.challenge_id == cid,
+            ChallengeAttempt.user_id == current_user.id,
+            ChallengeAttempt.attempted_at >= today_start
+        )
+        .order_by(ChallengeAttempt.attempted_at.desc())
     )
-    db.add(attempt)
+    existing_attempt = result.scalars().first()
+
+    if existing_attempt:
+        existing_attempt.submitted_code = body.code
+        existing_attempt.language = body.language
+        existing_attempt.output = json.dumps(eval_result)
+        existing_attempt.tests_passed = tests_passed
+        existing_attempt.tests_total = tests_total
+        # Only overwrite MCQ score if they actually answered MCQs in this step
+        if body.mcq_answers:
+            existing_attempt.mcqs_passed = mcqs_passed
+        existing_attempt.passed = passed
+        existing_attempt.submitted_at = datetime.now(timezone.utc)
+        attempt = existing_attempt
+    else:
+        attempt = ChallengeAttempt(
+            id=uuid.uuid4(),
+            user_id=current_user.id,
+            challenge_id=cid,
+            submitted_code=body.code,
+            language=body.language,
+            output=json.dumps(eval_result),
+            tests_passed=tests_passed,
+            tests_total=tests_total,
+            mcqs_passed=mcqs_passed,
+            passed=passed,
+            submitted_at=datetime.now(timezone.utc),
+        )
+        db.add(attempt)
+
     await db.commit()
     await db.refresh(attempt)
 
@@ -430,7 +457,7 @@ async def get_attempt_details(
         )
 
     attempt, challenge = row
-    
+
     # Try parsing eval output to extract stderr
     stderr = None
     if attempt.output:

@@ -72,22 +72,22 @@ class InterviewSession(Base):
         # Map conversation_history -> messages
         if "conversation_history" in kwargs:
             kwargs["messages"] = kwargs.pop("conversation_history")
-            
+
         # Map overall_score -> score
         if "overall_score" in kwargs:
             kwargs["score"] = kwargs.pop("overall_score")
-            
+
         # Map structured_output -> topics_covered (JSONB)
         structured_output = kwargs.pop("structured_output", {}) or {}
-        
+
         # If completed is passed, store inside structured_output
         if "completed" in kwargs:
             structured_output["completed"] = kwargs.pop("completed")
-            
+
         # If updated_at is passed, drop/ignore it (or store inside structured_output)
         if "updated_at" in kwargs:
             kwargs.pop("updated_at")
-            
+
         kwargs["topics_covered"] = structured_output
         super().__init__(**kwargs)
 

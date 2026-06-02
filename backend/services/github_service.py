@@ -932,7 +932,7 @@ class GitHubService:
             raw["python_sources"],
         )
 
-        sorted_langs = sorted(skills, key=lambda l: skills[l], reverse=True)
+        sorted_langs = sorted(skills, key=lambda lang: skills[lang], reverse=True)
 
         return {
             "skills":                skills,

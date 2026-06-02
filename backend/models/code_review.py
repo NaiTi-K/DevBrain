@@ -77,13 +77,13 @@ class CodeReview(Base):
         for field in review_fields:
             if field in kwargs:
                 review_dict[field] = kwargs.pop(field)
-        
+
         # Keep track of custom/missing fields by storing them in the JSONB review dict
         if "context" in kwargs:
             review_dict["context"] = kwargs.pop("context")
         if "reflection_score" in kwargs:
             review_dict["reflection_score"] = kwargs.pop("reflection_score")
-            
+
         kwargs["review"] = review_dict
         super().__init__(**kwargs)
 

@@ -163,7 +163,7 @@ _PY_SKIP = {
 def extract_cpp_info(code: str) -> tuple:
     """Return (func_name, needs_solution_instance)."""
     has_class = bool(re.search(r'class\s+Solution\s*[:{]', code))
-    
+
     # Restrict search code to Solution class body to prevent matching helper constructs
     search_code = code
     if has_class:

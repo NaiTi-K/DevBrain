@@ -14,7 +14,6 @@ import logging
 import uuid
 import io
 from datetime import datetime
-from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status, Form, File, UploadFile
 from pydantic import BaseModel, Field
@@ -322,10 +321,10 @@ async def send_message(
         db_session.updated_at = datetime.utcnow()
         if session_complete:
             db_session.completed_at = datetime.utcnow()
-            
+
         flag_modified(db_session, "messages")
         flag_modified(db_session, "topics_covered")
-        
+
         await db.commit()
     except Exception as exc:
         logger.error("Failed to update interview session %s: %s", session_id, exc)
