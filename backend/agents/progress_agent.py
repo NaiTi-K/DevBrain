@@ -1,150 +1,31 @@
 """
 Progress Agent
 ==============
-Computes analytics from ProgressSnapshot history: skill deltas, challenge pass
-rate, exam readiness per topic, activity streak, and a Grok-generated weekly
-digest.
+Computes analytics dynamically from database history: skill deltas, challenge pass
+rate, exam readiness per topic, activity streak, daily activities, and weekly digest.
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Optional
 
 from sqlalchemy import select
 
 from models.database import async_session
-from models.progress import ProgressSnapshot
-from services.cache_service import cache
+from models import (
+    User,
+    ChallengeAttempt,
+    CodeReview,
+    InterviewSession,
+    Roadmap,
+    SkillProfile,
+    ProgressSnapshot,
+)
 
 logger = logging.getLogger(__name__)
-
-
-# ═══════════════════════════════════════════════════════════════════════════ #
-# Agent node                                                                  #
-# ═══════════════════════════════════════════════════════════════════════════ #
-
-
-async def progress_agent_node(state: dict) -> dict:
-    """
-    LangGraph node: compute full progress analytics for the user.
-
-    Steps
-    -----
-    1. Load ProgressSnapshots for the last 30 days.
-    2. Load current skill profile from cache or DB.
-    3. Compute skill deltas (7 d & 30 d), challenge pass rate, streak,
-       and exam readiness per topic.
-    4. Upsert today's ProgressSnapshot.
-    5. Ask Grok for a 3-sentence weekly digest.
-    6. Populate state fields.
-    """
-    user_id: str = state["user_id"]
-
-    try:
-        now = datetime.utcnow()
-        cutoff_30d = now - timedelta(days=30)
-        cutoff_7d = now - timedelta(days=7)
-
-        # ── 1. Load snapshots from DB ──────────────────────────────────────
-        async with async_session() as session:
-            rows = await session.execute(
-                select(ProgressSnapshot)
-                .where(
-                    ProgressSnapshot.user_id == uuid.UUID(user_id),
-                    ProgressSnapshot.snapshot_date >= cutoff_30d.date(),
-                )
-                .order_by(ProgressSnapshot.snapshot_date.asc())
-            )
-            snapshots: list[ProgressSnapshot] = list(rows.scalars().all())
-
-        # ── 2. Resolve current skill profile ──────────────────────────────
-        skill_profile: dict = state.get("skill_profile") or {}
-        current_skills: dict[str, float] = skill_profile.get("skills", {})
-
-        if not current_skills:
-            cached = await cache.get_skill_profile(user_id)
-            if cached:
-                current_skills = cached.get("skills", {})
-
-        # ── 3a. Skill deltas ───────────────────────────────────────────────
-        skill_delta_7d: dict[str, float] = {}
-        skill_delta_30d: dict[str, float] = {}
-
-        snapshot_7d_ago = _nearest_snapshot(snapshots, cutoff_7d)
-        snapshot_30d_ago = snapshots[0] if snapshots else None
-
-        if snapshot_7d_ago and snapshot_7d_ago.skills:
-            old_7 = snapshot_7d_ago.skills
-            skill_delta_7d = {
-                k: round(current_skills.get(k, 0.0) - old_7.get(k, 0.0), 4)
-                for k in set(current_skills) | set(old_7)
-            }
-
-        if snapshot_30d_ago and snapshot_30d_ago.skills:
-            old_30 = snapshot_30d_ago.skills
-            skill_delta_30d = {
-                k: round(current_skills.get(k, 0.0) - old_30.get(k, 0.0), 4)
-                for k in set(current_skills) | set(old_30)
-            }
-
-        # ── 3b. Challenge pass rate ────────────────────────────────────────
-        total_done = sum(s.challenges_done for s in snapshots)
-        total_passed = sum(s.challenges_passed for s in snapshots)
-        pass_rate: float = round(total_passed / total_done, 4) if total_done else 0.0
-
-        # ── 3c. Streak (consecutive days with ≥ 1 challenge) ──────────────
-        streak: int = _compute_streak(snapshots, now)
-
-        # ── 3d. Exam readiness per topic (0-100) ──────────────────────────
-        exam_readiness: dict[str, int] = _compute_exam_readiness(
-            snapshots=snapshots,
-            current_skills=current_skills,
-            pass_rate=pass_rate,
-        )
-
-        # ── 4. Upsert today's ProgressSnapshot ────────────────────────────
-        today_snapshot_data = {
-            "skills": current_skills,
-            "challenges_done": _today_challenges_done(snapshots, now),
-            "challenges_passed": _today_challenges_passed(snapshots, now),
-        }
-        await _upsert_snapshot(user_id=user_id, now=now, data=today_snapshot_data)
-
-        # ── 5. Weekly digest (deterministic only — never competes with GitHub analyze)
-        weekly_digest: str = _deterministic_digest(
-            skill_delta_7d=skill_delta_7d,
-            pass_rate=pass_rate,
-            streak=streak,
-            exam_readiness=exam_readiness,
-        )
-
-        # ── 6. Build output ────────────────────────────────────────────────
-        structured: dict = {
-            "skill_delta_7d": skill_delta_7d,
-            "skill_delta_30d": skill_delta_30d,
-            "streak": streak,
-            "exam_readiness": exam_readiness,
-            "challenge_pass_rate": pass_rate,
-            "weekly_digest": weekly_digest,
-        }
-
-        return {
-            **state,
-            "structured_output": structured,
-            "agent_output": weekly_digest,
-            "error": None,
-        }
-
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("progress_agent_node failed: %s", exc)
-        return {
-            **state,
-            "agent_output": "Unable to compute progress data. Please try again.",
-            "error": str(exc),
-        }
 
 
 # ═══════════════════════════════════════════════════════════════════════════ #
@@ -152,72 +33,51 @@ async def progress_agent_node(state: dict) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════ #
 
 
-def _nearest_snapshot(
-    snapshots: list[ProgressSnapshot], target: datetime
-) -> Optional[ProgressSnapshot]:
+def _nearest_snapshot(snapshots: list[ProgressSnapshot], target: datetime) -> Optional[ProgressSnapshot]:
     """Return the snapshot whose date is closest to (but not after) `target`."""
     target_date = target.date()
     candidates = [s for s in snapshots if s.snapshot_date <= target_date]
     return candidates[-1] if candidates else None
 
 
-def _compute_streak(snapshots: list[ProgressSnapshot], now: datetime) -> int:
+def _calculate_consecutive_streaks(active_dates: set[date]) -> tuple[int, int, date | None]:
     """
-    Count the number of consecutive days ending today (or yesterday) where
-    challenges_done > 0 and greater than the day before.
+    Computes current streak, longest streak, and last activity date from a set of active dates.
     """
-    if not snapshots:
-        return 0
+    if not active_dates:
+        return 0, 0, None
 
-    # Build a date → snapshot map for quick lookup
-    by_date = {s.snapshot_date: s for s in snapshots}
-    streak = 0
-    check_date = now.date()
+    sorted_dates = sorted(list(active_dates))
+    today = datetime.utcnow().date()
+    yesterday = today - timedelta(days=1)
 
-    while True:
-        snap = by_date.get(check_date)
-        if snap and snap.challenges_done > 0:
-            streak += 1
-            check_date -= timedelta(days=1)
-        else:
-            break
+    # Longest streak
+    longest = 0
+    current_run = 0
+    prev_date = None
+    for d in sorted_dates:
+        if prev_date is None:
+            current_run = 1
+        elif d == prev_date + timedelta(days=1):
+            current_run += 1
+        elif d > prev_date + timedelta(days=1):
+            if current_run > longest:
+                longest = current_run
+            current_run = 1
+        prev_date = d
+    if current_run > longest:
+        longest = current_run
 
-    return streak
+    # Current streak (must end today or yesterday)
+    current = 0
+    last_act = sorted_dates[-1]
+    if last_act >= yesterday:
+        check = last_act
+        while check in active_dates:
+            current += 1
+            check -= timedelta(days=1)
 
-
-def _compute_exam_readiness(
-    snapshots: list[ProgressSnapshot],
-    current_skills: dict[str, float],
-    pass_rate: float,
-) -> dict[str, int]:
-    """
-    Heuristic exam readiness score per skill topic (0-100).
-    Formula: 50% raw skill score + 30% pass rate contribution + 20% recency bonus.
-    """
-    readiness: dict[str, int] = {}
-    recent_cutoff = (datetime.utcnow() - timedelta(days=7)).date()
-    has_recent_activity = any(s.snapshot_date >= recent_cutoff for s in snapshots)
-    recency_bonus = 20 if has_recent_activity else 0
-
-    for skill, score in current_skills.items():
-        raw_score_component = int(score * 50)          # 0-50
-        pass_rate_component = int(pass_rate * 30)      # 0-30
-        total = raw_score_component + pass_rate_component + recency_bonus
-        readiness[skill] = min(total, 100)
-
-    return readiness
-
-
-def _today_challenges_done(snapshots: list[ProgressSnapshot], now: datetime) -> int:
-    today = now.date()
-    snap = next((s for s in snapshots if s.snapshot_date == today), None)
-    return snap.challenges_done if snap else 0
-
-
-def _today_challenges_passed(snapshots: list[ProgressSnapshot], now: datetime) -> int:
-    today = now.date()
-    snap = next((s for s in snapshots if s.snapshot_date == today), None)
-    return snap.challenges_passed if snap else 0
+    return current, longest, last_act
 
 
 async def _upsert_snapshot(user_id: str, now: datetime, data: dict) -> None:
@@ -241,7 +101,7 @@ async def _upsert_snapshot(user_id: str, now: datetime, data: dict) -> None:
                     id=uuid.uuid4(),
                     user_id=uuid.UUID(user_id),
                     snapshot_date=today,
-                    skills=data["skills"],
+                    skills_snapshot=data["skills"],
                     challenges_done=data["challenges_done"],
                     challenges_passed=data["challenges_passed"],
                 )
@@ -250,14 +110,14 @@ async def _upsert_snapshot(user_id: str, now: datetime, data: dict) -> None:
 
 
 def _deterministic_digest(
-    skill_delta_7d: dict[str, float],
+    skill_delta_7d: list[dict],
     pass_rate: float,
     streak: int,
     exam_readiness: dict[str, int],
 ) -> str:
-    """Fast, non-LLM digest so dashboard loads never compete with GitHub analysis."""
-    improving = [k for k, v in skill_delta_7d.items() if v > 0.01]
-    declining = [k for k, v in skill_delta_7d.items() if v < -0.01]
+    """Fast, non-LLM digest summarizing progress."""
+    improving = [d["skill"] for d in skill_delta_7d if d["delta_7d"] > 0.01]
+    declining = [d["skill"] for d in skill_delta_7d if d["delta_7d"] < -0.01]
     top_ready = sorted(exam_readiness.items(), key=lambda x: x[1], reverse=True)[:3]
     top_ready_str = ", ".join(f"{k} ({v}%)" for k, v in top_ready) or "run GitHub analysis first"
 
@@ -276,32 +136,279 @@ def _deterministic_digest(
     )
 
 
-def _build_digest_prompt(
-    skill_delta_7d: dict[str, float],
-    pass_rate: float,
-    streak: int,
-    exam_readiness: dict[str, int],
-) -> str:
-    improving = [k for k, v in skill_delta_7d.items() if v > 0]
-    declining = [k for k, v in skill_delta_7d.items() if v < 0]
+# ═══════════════════════════════════════════════════════════════════════════ #
+# Agent node                                                                  #
+# ═══════════════════════════════════════════════════════════════════════════ #
 
-    top_ready = sorted(exam_readiness.items(), key=lambda x: x[1], reverse=True)[:3]
-    top_ready_str = ", ".join(f"{k} ({v}%)" for k, v in top_ready) or "N/A"
 
-    return (
-        f"You are an encouraging engineering career coach writing a weekly progress digest.\n\n"
-        f"Stats this week:\n"
-        f"  - Current activity streak : {streak} day(s)\n"
-        f"  - Challenge pass rate      : {pass_rate * 100:.1f}%\n"
-        f"  - Improving skills         : {', '.join(improving) or 'none'}\n"
-        f"  - Declining/stagnant skills: {', '.join(declining) or 'none'}\n"
-        f"  - Top exam-ready topics    : {top_ready_str}\n\n"
-        f"Write a comprehensive markdown-formatted weekly progress digest. You MUST include these three exact headers:\n"
-        f"#### Progress & Wins\n"
-        f"Celebrate their progress, highlighting specific improving skills and their current streak/pass rate.\n\n"
-        f"#### Areas for Improvement\n"
-        f"Highlight the most important areas that still need work based on declining or stagnant skills.\n\n"
-        f"#### Action Plan\n"
-        f"Give concrete actions for the coming week to maintain momentum and tackle weak areas.\n\n"
-        f"Be warm, motivational, and highly specific to the provided stats."
-    )
+async def progress_agent_node(state: dict) -> dict:
+    """
+    LangGraph node: compute full progress analytics dynamically.
+    """
+    user_id: str = state["user_id"]
+
+    try:
+        now = datetime.utcnow()
+        cutoff_30d = now - timedelta(days=30)
+        cutoff_7d = now - timedelta(days=7)
+
+        # ── 1. Fetch all relevant records from DB ─────────────────────────────
+        async with async_session() as session:
+            # Fetch User
+            user_res = await session.execute(select(User).where(User.id == uuid.UUID(user_id)))
+            user = user_res.scalar_one_or_none()
+            if not user:
+                raise ValueError(f"User {user_id} not found.")
+
+            # Fetch SkillProfile
+            sp_res = await session.execute(
+                select(SkillProfile)
+                .where(SkillProfile.user_id == uuid.UUID(user_id))
+                .order_by(SkillProfile.analyzed_at.desc())
+                .limit(1)
+            )
+            skill_profile = sp_res.scalar_one_or_none()
+
+            # Fetch ChallengeAttempts
+            attempts_res = await session.execute(
+                select(ChallengeAttempt)
+                .where(ChallengeAttempt.user_id == uuid.UUID(user_id))
+                .order_by(ChallengeAttempt.attempted_at.asc())
+            )
+            attempts = list(attempts_res.scalars().all())
+
+            # Fetch CodeReviews
+            reviews_res = await session.execute(
+                select(CodeReview).where(CodeReview.user_id == uuid.UUID(user_id)).order_by(CodeReview.created_at.asc())
+            )
+            reviews = list(reviews_res.scalars().all())
+
+            # Fetch InterviewSessions
+            interviews_res = await session.execute(
+                select(InterviewSession)
+                .where(InterviewSession.user_id == uuid.UUID(user_id))
+                .order_by(InterviewSession.created_at.asc())
+            )
+            interviews = list(interviews_res.scalars().all())
+
+            # Fetch active Roadmap
+            roadmap_res = await session.execute(
+                select(Roadmap)
+                .where(Roadmap.user_id == uuid.UUID(user_id), Roadmap.is_active == True)  # noqa: E712
+                .order_by(Roadmap.created_at.desc())
+                .limit(1)
+            )
+            roadmap = roadmap_res.scalar_one_or_none()
+
+            # Fetch all ProgressSnapshots (last 30 days)
+            snapshots_res = await session.execute(
+                select(ProgressSnapshot)
+                .where(
+                    ProgressSnapshot.user_id == uuid.UUID(user_id),
+                    ProgressSnapshot.snapshot_date >= cutoff_30d.date(),
+                )
+                .order_by(ProgressSnapshot.snapshot_date.asc())
+            )
+            snapshots = list(snapshots_res.scalars().all())
+
+        # ── 2. User Data ──────────────────────────────────────────────────────
+        user_data = {
+            "id": str(user.id),
+            "github_id": user.github_id,
+            "username": user.github_username,
+            "email": None,
+            "avatar_url": user.avatar_url,
+            "name": user.display_name,
+            "created_at": user.created_at.isoformat() if user.created_at else "",
+            "updated_at": user.created_at.isoformat() if user.created_at else "",
+        }
+
+        # ── 3. Skill Profile ──────────────────────────────────────────────────
+        skill_profile_data = None
+        current_skills: dict[str, float] = {}
+        if skill_profile:
+            current_skills = skill_profile.skills or {}
+            skill_profile_data = {
+                "user_id": str(skill_profile.user_id),
+                "github_username": user.github_username,
+                "skills": current_skills,
+                "summary": skill_profile.summary or "",
+                "repo_count": skill_profile.repo_count or 0,
+                "analyzed_at": skill_profile.analyzed_at,
+            }
+
+        # ── 4. Unified Activity Streak ────────────────────────────────────────
+        active_dates = set()
+        for att in attempts:
+            active_dates.add(att.attempted_at.date())
+        for rev in reviews:
+            active_dates.add(rev.created_at.date())
+        for iv in interviews:
+            active_dates.add(iv.created_at.date())
+
+        current_streak, longest_streak, last_act_date = _calculate_consecutive_streaks(active_dates)
+        streak_data = {
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "last_activity_date": last_act_date,
+        }
+
+        # ── 5. Skill Deltas ───────────────────────────────────────────────────
+        snap_7d = _nearest_snapshot(snapshots, cutoff_7d)
+        skills_7d = snap_7d.skills if snap_7d else {}
+
+        snap_30d = snapshots[0] if snapshots else None
+        skills_30d = snap_30d.skills if snap_30d else {}
+
+        skill_deltas = []
+        for skill, current_score in current_skills.items():
+            delta_7 = current_score - skills_7d.get(skill, 0.0)
+            delta_30 = current_score - skills_30d.get(skill, 0.0)
+            skill_deltas.append(
+                {
+                    "skill": skill,
+                    "delta_7d": round(delta_7, 4),
+                    "delta_30d": round(delta_30, 4),
+                    "current_score": round(current_score, 4),
+                }
+            )
+
+        # ── 6. Challenge Metrics & Pass Rate ──────────────────────────────────
+        solved_challenge_ids = {att.challenge_id for att in attempts if att.passed}
+        total_challenges_solved = len(solved_challenge_ids)
+        total_reviews_submitted = len(reviews)
+        total_interview_sessions = sum(1 for iv in interviews if (iv.score is not None or iv.completed))
+
+        total_attempts = len(attempts)
+        passed_attempts = sum(1 for att in attempts if att.passed)
+        pass_rate = passed_attempts / total_attempts if total_attempts > 0 else 0.0
+
+        start_of_week = (now - timedelta(days=now.weekday())).date()
+        weekly_solved_ids = {
+            att.challenge_id for att in attempts if att.passed and att.attempted_at.date() >= start_of_week
+        }
+        weekly_challenges_done = len(weekly_solved_ids)
+        weekly_challenge_goal = 5
+
+        # ── 7. Exam Readiness ─────────────────────────────────────────────────
+        exam_readiness = {}
+        for skill, score in current_skills.items():
+            raw_score_component = int(score * 50)  # 0-50
+            pass_rate_component = int(pass_rate * 30)  # 0-30
+            recency_bonus = 20 if last_act_date and last_act_date >= cutoff_7d.date() else 0
+            total = raw_score_component + pass_rate_component + recency_bonus
+            exam_readiness[skill] = min(total, 100)
+
+        exam_readiness_score = sum(exam_readiness.values()) / (100.0 * len(exam_readiness)) if exam_readiness else 0.0
+
+        # ── 8. Daily Activity (last 30 days) ──────────────────────────────────
+        daily_activity = []
+        for i in range(30):
+            d = (now - timedelta(days=29 - i)).date()
+            challenges_solved_d = sum(1 for att in attempts if att.passed and att.attempted_at.date() == d)
+            reviews_submitted_d = sum(1 for rev in reviews if rev.created_at.date() == d)
+            interview_sessions_d = sum(1 for iv in interviews if iv.created_at.date() == d)
+            total_activity_d = challenges_solved_d + reviews_submitted_d + interview_sessions_d
+
+            daily_activity.append(
+                {
+                    "date": d.isoformat(),
+                    "challenges_solved": challenges_solved_d,
+                    "reviews_submitted": reviews_submitted_d,
+                    "interview_sessions": interview_sessions_d,
+                    "total_activity": total_activity_d,
+                }
+            )
+
+        # ── 9. Skill Trend Data ───────────────────────────────────────────────
+        trend_data = []
+        for s in snapshots:
+            snap_date = s.snapshot_date
+            avg_score = sum(s.skills.values()) / len(s.skills) if s.skills else 0.0
+            trend_data.append(
+                {
+                    "date": snap_date.isoformat(),
+                    "score": round(avg_score * 100.0, 2),
+                }
+            )
+
+        if not trend_data and current_skills:
+            avg_score = sum(current_skills.values()) / len(current_skills)
+            trend_data.append(
+                {
+                    "date": now.date().isoformat(),
+                    "score": round(avg_score * 100.0, 2),
+                }
+            )
+
+        # ── 10. Roadmap Tracker ───────────────────────────────────────────────
+        roadmap_tracker = None
+        if roadmap:
+            weeks = roadmap.plan.get("weeks", [])
+            total_topics = sum(len(w.get("topics", [])) for w in weeks)
+            completed_topics = sum(len(w.get("completed_topics", [])) for w in weeks)
+            completed_weeks = sum(1 for w in weeks if w.get("completed") is True)
+            percent_completed = completed_topics / total_topics if total_topics > 0 else 0.0
+            roadmap_tracker = {
+                "id": str(roadmap.id),
+                "target_role": roadmap.target_role,
+                "total_weeks": len(weeks),
+                "completed_weeks": completed_weeks,
+                "percent_completed": percent_completed,
+                "total_topics": total_topics,
+                "completed_topics": completed_topics,
+            }
+
+        # ── 11. Upsert today's snapshot ───────────────────────────────────────
+        today_snapshot_data = {
+            "skills": current_skills,
+            "challenges_done": sum(1 for att in attempts if att.attempted_at.date() == now.date()),
+            "challenges_passed": sum(1 for att in attempts if att.passed and att.attempted_at.date() == now.date()),
+        }
+        await _upsert_snapshot(user_id=user_id, now=now, data=today_snapshot_data)
+
+        # ── 12. Weekly Digest ─────────────────────────────────────────────────
+        weekly_digest = _deterministic_digest(
+            skill_delta_7d=skill_deltas,
+            pass_rate=pass_rate,
+            streak=current_streak,
+            exam_readiness=exam_readiness,
+        )
+
+        # ── 13. Build final output ────────────────────────────────────────────
+        structured = {
+            "user": user_data,
+            "streak": streak_data,
+            "skill_profile": skill_profile_data,
+            "skill_deltas": skill_deltas,
+            "total_challenges_solved": total_challenges_solved,
+            "total_reviews_submitted": total_reviews_submitted,
+            "total_interview_sessions": total_interview_sessions,
+            "exam_readiness_score": exam_readiness_score,
+            "exam_readiness": exam_readiness,
+            "weekly_digest": weekly_digest,
+            "daily_activity": daily_activity,
+            "trend_data": trend_data,
+            "weekly_challenge_goal": weekly_challenge_goal,
+            "weekly_challenges_done": weekly_challenges_done,
+            "roadmap_tracker": roadmap_tracker,
+            # Backward-compatible fields
+            "skill_delta_7d": {d["skill"]: d["delta_7d"] for d in skill_deltas},
+            "skill_delta_30d": {d["skill"]: d["delta_30d"] for d in skill_deltas},
+            "challenge_pass_rate": pass_rate,
+        }
+
+        return {
+            **state,
+            "structured_output": structured,
+            "agent_output": weekly_digest,
+            "error": None,
+        }
+
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("progress_agent_node failed: %s", exc)
+        return {
+            **state,
+            "agent_output": "Unable to compute progress data. Please try again.",
+            "error": str(exc),
+        }

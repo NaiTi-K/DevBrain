@@ -46,6 +46,7 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # ── Offline migrations ────────────────────────────────────────────────────────
 
+
 def run_migrations_offline() -> None:
     """
     Run migrations without a live DB connection.
@@ -66,6 +67,7 @@ def run_migrations_offline() -> None:
 
 
 # ── Online migrations (async) ────────────────────────────────────────────────
+
 
 async def run_async_migrations() -> None:
     """

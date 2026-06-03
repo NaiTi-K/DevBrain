@@ -226,6 +226,15 @@ export async function getCurrentRoadmap(): Promise<any> {
 
 export { getCurrentRoadmap as getRoadmap };
 
+/** Partially update a roadmap's plan JSON. */
+export async function patchRoadmap(
+  roadmap_id: string,
+  plan: any
+): Promise<any> {
+  const res = await apiRequest<any>("PATCH", `/roadmap/${roadmap_id}`, { plan });
+  return transformRoadmap(res);
+}
+
 // ---------------------------------------------------------------------------
 // Challenges
 // ---------------------------------------------------------------------------
@@ -302,38 +311,8 @@ export async function submitCodeReview(
   context?: string,
 ): Promise<any> {
   const body: SubmitCodeReviewRequest = { code, language, context };
-  const res = await apiRequest<any>("POST", "/review/submit", body);
-
-  if (!res || !res.review) return null;
-
-  const review = res.review;
-  return {
-    id: res.review_id,
-    user_id: "",
-    code: code,
-    language: language,
-    context: context || null,
-    score: review.score ?? 0,
-    time_complexity: review.complexity?.time ?? "O(?)",
-    space_complexity: review.complexity?.space ?? "O(?)",
-    reflection_loops: res.reflection_loops ?? 0,
-    summary: review.summary ?? "",
-    annotations: (review.annotations ?? []).map((a: any) => ({
-      line: a.line,
-      message: `${a.issue} (Fix: ${a.fix})`
-    })),
-    edge_cases: review.edge_cases ?? [],
-    improvements: (review.improvements ?? []).map((i: any) => ({
-      title: i.title || "Improvement",
-      description: i.description,
-      code_after: i.code_after || i.code_example,
-      verification: i.verification
-    })),
-    best_practices: review.best_practices ?? [],
-    ast_facts: review.ast_facts,
-    lint_facts: review.lint_facts,
-    reviewed_at: new Date().toISOString()
-  };
+  const res = await apiRequest<any>("POST", "/code-reviewer/review", body);
+  return res;
 }
 
 /** Open an SSE stream for real-time code review tokens. */
@@ -348,16 +327,23 @@ export function streamCodeReview(
   const params = new URLSearchParams({ code, language });
   if (token) params.set("token", token);
 
-  const url = `${BASE_URL}/review/stream?${params.toString()}`;
+  const url = `${BASE_URL}/code-reviewer/stream?${params.toString()}`;
   const es = new EventSource(url);
 
   es.onmessage = (event: MessageEvent) => {
-    if (event.data === "[DONE]") {
+    if (event.data === "[REVIEW_DONE]") {
       es.close();
       onComplete?.();
       return;
     }
-    onChunk(event.data as string);
+    if (event.data.startsWith("[REVIEW_ERROR]")) {
+      es.close();
+      onError?.(new Event("error"));
+      return;
+    }
+    // Unescape the \n we encoded server-side
+    const chunk = event.data.replace(/\\n/g, "\n");
+    onChunk(chunk);
   };
 
   es.onerror = (err: Event) => {
@@ -475,13 +461,22 @@ export async function getProgressDashboard(): Promise<any> {
     delta30d[k] = Math.round((v as number) * 100);
   }
 
+  const skillDeltasMapped = (res.skill_deltas ?? []).map((d: any) => ({
+    skill: d.skill,
+    delta_7d: Math.round(d.delta_7d * 100),
+    delta_30d: Math.round(d.delta_30d * 100),
+    current_score: Math.round(d.current_score * 100),
+  }));
+
   return {
     ...res,
+    skill_profile: transformSkillProfile(res.skill_profile),
     skill_delta_7d: delta7d,
     skill_delta_30d: delta30d,
+    skill_deltas: skillDeltasMapped,
     recent_activity: [
       `Completed challenges with ${Math.round(res.challenge_pass_rate * 100)}% pass rate`,
-      `Active streak is currently ${res.streak} day(s)`
+      `Active streak is currently ${res.streak?.current_streak ?? 0} day(s)`
     ]
   };
 }

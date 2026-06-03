@@ -45,8 +45,7 @@ async def roadmap_agent_node(state: dict) -> dict:
                 if not analysis_report and cached.get("skills"):
                     analysis_report = build_analysis_report(
                         cached,
-                        cached.get("github_username")
-                        or state.get("github_username", ""),
+                        cached.get("github_username") or state.get("github_username", ""),
                     )
                 skill_profile = {
                     "skills": cached.get("skills", {}),
@@ -58,9 +57,7 @@ async def roadmap_agent_node(state: dict) -> dict:
                 }
 
         if not analysis_report or not analysis_report.get("skills"):
-            raise ValueError(
-                "No GitHub analysis found. Run POST /github/analyze before generating a roadmap."
-            )
+            raise ValueError("No GitHub analysis found. Run POST /github/analyze before generating a roadmap.")
 
         structured_out = state.get("structured_output") or {}
         target_role: str = structured_out.get("target_role") or "Full Stack Engineer"
@@ -115,8 +112,6 @@ async def roadmap_agent_node(state: dict) -> dict:
         logger.exception("roadmap_agent_node failed: %s", exc)
         return {
             **state,
-            "agent_output": (
-                "Failed to generate roadmap. Run GitHub analysis first, then try again."
-            ),
+            "agent_output": ("Failed to generate roadmap. Run GitHub analysis first, then try again."),
             "error": str(exc),
         }

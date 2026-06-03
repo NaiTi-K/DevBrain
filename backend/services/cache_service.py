@@ -59,7 +59,6 @@ class CacheService:
             logger.warning("Cache INCR failed for key=%s: %s", key, exc)
             return 1
 
-
     # ------------------------------------------------------------------
     # Skill profile helpers
     # ------------------------------------------------------------------

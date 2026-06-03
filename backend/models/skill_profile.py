@@ -57,9 +57,7 @@ class SkillProfile(Base):
     )
 
     # ── Additional indexes ────────────────────────────────────────────────────
-    __table_args__ = (
-        Index("ix_skill_profiles_user_analyzed", "user_id", "analyzed_at"),
-    )
+    __table_args__ = (Index("ix_skill_profiles_user_analyzed", "user_id", "analyzed_at"),)
 
     def __init__(self, **kwargs):
         if "github_username" in kwargs:

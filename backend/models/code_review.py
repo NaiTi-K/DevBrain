@@ -72,7 +72,15 @@ class CodeReview(Base):
 
     def __init__(self, **kwargs):
         # Extract fields that belong to the `review` dict
-        review_fields = ["score", "annotations", "complexity", "edge_cases", "improvements", "best_practices", "summary"]
+        review_fields = [
+            "score",
+            "annotations",
+            "complexity",
+            "edge_cases",
+            "improvements",
+            "best_practices",
+            "summary",
+        ]
         review_dict = kwargs.pop("review", {}) or {}
         for field in review_fields:
             if field in kwargs:
@@ -97,7 +105,4 @@ class CodeReview(Base):
 
     def __repr__(self) -> str:
         score = self.review.get("score") if isinstance(self.review, dict) else "?"
-        return (
-            f"<CodeReview id={self.id} lang={self.language} "
-            f"score={score} loops={self.reflection_loops}>"
-        )
+        return f"<CodeReview id={self.id} lang={self.language} score={score} loops={self.reflection_loops}>"

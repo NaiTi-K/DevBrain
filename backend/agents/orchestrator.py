@@ -210,11 +210,7 @@ for _node in [
 _builder.add_edge("code_reviewer", "reflector")
 
 # Reflector conditional router
-_builder.add_conditional_edges(
-    "reflector",
-    should_reflect_again,
-    {"review_again": "code_reviewer", "done": END}
-)
+_builder.add_conditional_edges("reflector", should_reflect_again, {"review_again": "code_reviewer", "done": END})
 
 # ── Compile ────────────────────────────────────────────────────────────────
 app = _builder.compile()

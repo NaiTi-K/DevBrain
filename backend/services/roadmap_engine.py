@@ -35,31 +35,51 @@ ROLE_REQUIREMENTS: dict[str, dict[str, Any]] = {
         "frameworks": {"React": 0.5, "Node.js": 0.4, "Express": 0.35},
         "practices": {"test_signal": 0.4, "has_cicd": True, "commit_quality": 0.35},
         "topics_pool": [
-            ("fullstack_integration", "Full-stack feature slice", [
-                "Connect React frontend to REST API",
-                "Shared TypeScript types between client/server",
-                "Error handling across the stack",
-            ]),
-            ("database_layer", "Database & persistence", [
-                "Schema design and migrations",
-                "ORM/query patterns (SQLAlchemy or Prisma)",
-                "Indexing and basic query optimization",
-            ]),
-            ("auth", "Authentication & authorization", [
-                "JWT or session-based auth",
-                "Protected routes on frontend and backend",
-                "Role-based access patterns",
-            ]),
-            ("deployment", "Production deployment", [
-                "Docker multi-stage builds",
-                "Environment configuration",
-                "Health checks and logging",
-            ]),
-            ("testing_fullstack", "End-to-end testing", [
-                "API integration tests",
-                "Component tests with React Testing Library",
-                "CI pipeline running all test layers",
-            ]),
+            (
+                "fullstack_integration",
+                "Full-stack feature slice",
+                [
+                    "Connect React frontend to REST API",
+                    "Shared TypeScript types between client/server",
+                    "Error handling across the stack",
+                ],
+            ),
+            (
+                "database_layer",
+                "Database & persistence",
+                [
+                    "Schema design and migrations",
+                    "ORM/query patterns (SQLAlchemy or Prisma)",
+                    "Indexing and basic query optimization",
+                ],
+            ),
+            (
+                "auth",
+                "Authentication & authorization",
+                [
+                    "JWT or session-based auth",
+                    "Protected routes on frontend and backend",
+                    "Role-based access patterns",
+                ],
+            ),
+            (
+                "deployment",
+                "Production deployment",
+                [
+                    "Docker multi-stage builds",
+                    "Environment configuration",
+                    "Health checks and logging",
+                ],
+            ),
+            (
+                "testing_fullstack",
+                "End-to-end testing",
+                [
+                    "API integration tests",
+                    "Component tests with React Testing Library",
+                    "CI pipeline running all test layers",
+                ],
+            ),
         ],
     },
     "Backend Engineer": {
@@ -67,26 +87,51 @@ ROLE_REQUIREMENTS: dict[str, dict[str, Any]] = {
         "frameworks": {"FastAPI": 0.45, "Django": 0.40, "SQLAlchemy": 0.35},
         "practices": {"test_signal": 0.5, "has_cicd": True, "commit_quality": 0.40},
         "topics_pool": [
-            ("api_design", "API design & versioning", [
-                "REST resource modeling", "Input validation with Pydantic",
-                "Pagination, filtering, error contracts",
-            ]),
-            ("system_design", "System design fundamentals", [
-                "Caching strategies (Redis)", "Message queues overview",
-                "Rate limiting and idempotency",
-            ]),
-            ("database_backend", "Database engineering", [
-                "Transaction isolation", "Migration strategy",
-                "Connection pooling",
-            ]),
-            ("observability", "Observability", [
-                "Structured logging", "Metrics and alerting basics",
-                "Distributed tracing intro",
-            ]),
-            ("testing_backend", "Backend testing", [
-                "pytest fixtures and mocking", "Testcontainers for DB tests",
-                "Load testing basics",
-            ]),
+            (
+                "api_design",
+                "API design & versioning",
+                [
+                    "REST resource modeling",
+                    "Input validation with Pydantic",
+                    "Pagination, filtering, error contracts",
+                ],
+            ),
+            (
+                "system_design",
+                "System design fundamentals",
+                [
+                    "Caching strategies (Redis)",
+                    "Message queues overview",
+                    "Rate limiting and idempotency",
+                ],
+            ),
+            (
+                "database_backend",
+                "Database engineering",
+                [
+                    "Transaction isolation",
+                    "Migration strategy",
+                    "Connection pooling",
+                ],
+            ),
+            (
+                "observability",
+                "Observability",
+                [
+                    "Structured logging",
+                    "Metrics and alerting basics",
+                    "Distributed tracing intro",
+                ],
+            ),
+            (
+                "testing_backend",
+                "Backend testing",
+                [
+                    "pytest fixtures and mocking",
+                    "Testcontainers for DB tests",
+                    "Load testing basics",
+                ],
+            ),
         ],
     },
     "Frontend Engineer": {
@@ -94,26 +139,51 @@ ROLE_REQUIREMENTS: dict[str, dict[str, Any]] = {
         "frameworks": {"React": 0.55, "Next.js": 0.40, "Tailwind CSS": 0.30},
         "practices": {"test_signal": 0.35, "has_cicd": True, "commit_quality": 0.30},
         "topics_pool": [
-            ("react_advanced", "Advanced React patterns", [
-                "Custom hooks", "Context vs state libraries",
-                "Performance (memo, lazy, Suspense)",
-            ]),
-            ("typescript_fe", "TypeScript for UI", [
-                "Generics in components", "Discriminated unions for UI state",
-                "Strict mode migration",
-            ]),
-            ("a11y", "Accessibility & UX", [
-                "ARIA patterns", "Keyboard navigation",
-                "Screen reader testing",
-            ]),
-            ("css_modern", "Modern CSS & layout", [
-                "Flexbox/Grid systems", "Responsive design tokens",
-                "Animation performance",
-            ]),
-            ("fe_testing", "Frontend testing", [
-                "Vitest/Jest component tests", "MSW for API mocking",
-                "Visual regression intro",
-            ]),
+            (
+                "react_advanced",
+                "Advanced React patterns",
+                [
+                    "Custom hooks",
+                    "Context vs state libraries",
+                    "Performance (memo, lazy, Suspense)",
+                ],
+            ),
+            (
+                "typescript_fe",
+                "TypeScript for UI",
+                [
+                    "Generics in components",
+                    "Discriminated unions for UI state",
+                    "Strict mode migration",
+                ],
+            ),
+            (
+                "a11y",
+                "Accessibility & UX",
+                [
+                    "ARIA patterns",
+                    "Keyboard navigation",
+                    "Screen reader testing",
+                ],
+            ),
+            (
+                "css_modern",
+                "Modern CSS & layout",
+                [
+                    "Flexbox/Grid systems",
+                    "Responsive design tokens",
+                    "Animation performance",
+                ],
+            ),
+            (
+                "fe_testing",
+                "Frontend testing",
+                [
+                    "Vitest/Jest component tests",
+                    "MSW for API mocking",
+                    "Visual regression intro",
+                ],
+            ),
         ],
     },
     "DevOps / Platform Engineer": {
@@ -121,26 +191,51 @@ ROLE_REQUIREMENTS: dict[str, dict[str, Any]] = {
         "frameworks": {},
         "practices": {"test_signal": 0.3, "has_cicd": True, "commit_quality": 0.40},
         "topics_pool": [
-            ("cicd_deep", "CI/CD pipelines", [
-                "Multi-stage GitHub Actions", "Matrix builds",
-                "Secrets management",
-            ]),
-            ("containers", "Containers & orchestration", [
-                "Dockerfile best practices", "Docker Compose for local dev",
-                "Kubernetes fundamentals",
-            ]),
-            ("iac", "Infrastructure as Code", [
-                "Terraform modules", "State management",
-                "Environment promotion",
-            ]),
-            ("monitoring", "Monitoring & SRE", [
-                "Prometheus/Grafana basics", "SLIs and SLOs",
-                "Incident response runbooks",
-            ]),
-            ("security_ops", "DevSecOps", [
-                "Dependency scanning", "SAST in CI",
-                "Least-privilege IAM",
-            ]),
+            (
+                "cicd_deep",
+                "CI/CD pipelines",
+                [
+                    "Multi-stage GitHub Actions",
+                    "Matrix builds",
+                    "Secrets management",
+                ],
+            ),
+            (
+                "containers",
+                "Containers & orchestration",
+                [
+                    "Dockerfile best practices",
+                    "Docker Compose for local dev",
+                    "Kubernetes fundamentals",
+                ],
+            ),
+            (
+                "iac",
+                "Infrastructure as Code",
+                [
+                    "Terraform modules",
+                    "State management",
+                    "Environment promotion",
+                ],
+            ),
+            (
+                "monitoring",
+                "Monitoring & SRE",
+                [
+                    "Prometheus/Grafana basics",
+                    "SLIs and SLOs",
+                    "Incident response runbooks",
+                ],
+            ),
+            (
+                "security_ops",
+                "DevSecOps",
+                [
+                    "Dependency scanning",
+                    "SAST in CI",
+                    "Least-privilege IAM",
+                ],
+            ),
         ],
     },
     "ML / AI Engineer": {
@@ -148,26 +243,51 @@ ROLE_REQUIREMENTS: dict[str, dict[str, Any]] = {
         "frameworks": {"PyTorch": 0.35, "LangChain": 0.30, "Pydantic": 0.40},
         "practices": {"test_signal": 0.35, "has_cicd": True, "commit_quality": 0.30},
         "topics_pool": [
-            ("ml_pipeline", "ML pipelines", [
-                "Data versioning", "Experiment tracking",
-                "Reproducible training scripts",
-            ]),
-            ("model_eval", "Model evaluation", [
-                "Metrics selection", "Cross-validation",
-                "Bias and error analysis",
-            ]),
-            ("llm_apps", "LLM application engineering", [
-                "Prompt engineering patterns", "RAG architecture",
-                "Evaluation harnesses for LLM outputs",
-            ]),
-            ("deployment_ml", "ML deployment", [
-                "Model serving (FastAPI)", "Batch vs realtime inference",
-                "Monitoring model drift",
-            ]),
-            ("feature_eng", "Feature engineering", [
-                "Feature stores intro", "Pipeline orchestration",
-                "Data quality checks",
-            ]),
+            (
+                "ml_pipeline",
+                "ML pipelines",
+                [
+                    "Data versioning",
+                    "Experiment tracking",
+                    "Reproducible training scripts",
+                ],
+            ),
+            (
+                "model_eval",
+                "Model evaluation",
+                [
+                    "Metrics selection",
+                    "Cross-validation",
+                    "Bias and error analysis",
+                ],
+            ),
+            (
+                "llm_apps",
+                "LLM application engineering",
+                [
+                    "Prompt engineering patterns",
+                    "RAG architecture",
+                    "Evaluation harnesses for LLM outputs",
+                ],
+            ),
+            (
+                "deployment_ml",
+                "ML deployment",
+                [
+                    "Model serving (FastAPI)",
+                    "Batch vs realtime inference",
+                    "Monitoring model drift",
+                ],
+            ),
+            (
+                "feature_eng",
+                "Feature engineering",
+                [
+                    "Feature stores intro",
+                    "Pipeline orchestration",
+                    "Data quality checks",
+                ],
+            ),
         ],
     },
 }
@@ -220,26 +340,30 @@ def _role_skill_objectives(
     for lang, target in reqs.get("languages", {}).items():
         current = skills.get(lang, 0.0)
         if current < target and current < MASTERED_THRESHOLD:
-            objectives.append({
-                "type": "language",
-                "name": lang,
-                "current": current,
-                "target": target,
-                "priority": target - current,
-            })
+            objectives.append(
+                {
+                    "type": "language",
+                    "name": lang,
+                    "current": current,
+                    "target": target,
+                    "priority": target - current,
+                }
+            )
 
     for fw, target in reqs.get("frameworks", {}).items():
         current = frameworks.get(fw, 0.0)
         if current < target and current < MASTERED_THRESHOLD:
             # Also check partial matches (e.g. Express via package.json)
             if not _has_framework(frameworks, [fw]):
-                objectives.append({
-                    "type": "framework",
-                    "name": fw,
-                    "current": current,
-                    "target": target,
-                    "priority": target - current,
-                })
+                objectives.append(
+                    {
+                        "type": "framework",
+                        "name": fw,
+                        "current": current,
+                        "target": target,
+                        "priority": target - current,
+                    }
+                )
 
     objectives.sort(key=lambda x: x["priority"], reverse=True)
     return objectives
@@ -260,8 +384,7 @@ def _practice_week(gap: dict, repo: dict | None, week_num: int) -> dict:
                 "CI job running tests on every push",
             ],
             "project_idea": (
-                f"Add a test suite to `{repo_name}` covering at least 3 core modules; "
-                f"gate merges on passing tests."
+                f"Add a test suite to `{repo_name}` covering at least 3 core modules; gate merges on passing tests."
             ),
             "reason": (
                 f"Gap analysis flagged weak testing ({gap.get('detail', '')}). "
@@ -279,13 +402,9 @@ def _practice_week(gap: dict, repo: dict | None, week_num: int) -> dict:
                 "Branch protection rules",
             ],
             "project_idea": (
-                f"Create `.github/workflows/ci.yml` in `{repo_name}` running lint, "
-                f"tests, and build on PR and main."
+                f"Create `.github/workflows/ci.yml` in `{repo_name}` running lint, tests, and build on PR and main."
             ),
-            "reason": (
-                f"No CI/CD detected across top repos. `{repo_name}` gets automated "
-                f"quality gates first."
-            ),
+            "reason": (f"No CI/CD detected across top repos. `{repo_name}` gets automated quality gates first."),
         }
 
     if gap.get("id") == "practice_commits":
@@ -327,8 +446,7 @@ def _practice_week(gap: dict, repo: dict | None, week_num: int) -> dict:
         "topics": gap.get("action", "Improve project quality").split("; ")[:3]
         or ["Project documentation", "Basic tests", "CI setup"],
         "project_idea": (
-            f"Address '{gap.get('title')}' on `{repo_name}` — "
-            f"{gap.get('action', 'improve engineering practices')}."
+            f"Address '{gap.get('title')}' on `{repo_name}` — {gap.get('action', 'improve engineering practices')}."
         ),
         "reason": gap.get("detail", f"Priority repo `{repo_name}` needs attention."),
     }
@@ -419,9 +537,7 @@ def build_roadmap_plan(analysis_report: dict, target_role: str) -> dict:
                 return False
         return True
 
-    filtered_topics = [
-        t for t in topics_pool if _topic_relevant(t[0], t[2])
-    ]
+    filtered_topics = [t for t in topics_pool if _topic_relevant(t[0], t[2])]
 
     weeks: list[dict] = []
     used_gaps: set[str] = set()
@@ -463,39 +579,50 @@ def build_roadmap_plan(analysis_report: dict, target_role: str) -> dict:
         obj = next(obj_iter, None)
         topic = next(topic_iter, None)
         if obj and topic:
-            weeks.append(_skill_week(
-                obj, topic, _next_repo() or primary_repo,
-                len(weeks) + 1, analysis_report["primary_stack"]["label"],
-            ))
+            weeks.append(
+                _skill_week(
+                    obj,
+                    topic,
+                    _next_repo() or primary_repo,
+                    len(weeks) + 1,
+                    analysis_report["primary_stack"]["label"],
+                )
+            )
         elif topic:
-            weeks.append({
-                "week": len(weeks) + 1,
-                "focus": topic[1],
-                "topics": topic[2][:4],
-                "project_idea": (
-                    f"Apply {topic[1]} to `{primary_repo['name'] if primary_repo else 'your main repo'}`."
-                ),
-                "reason": f"Role-aligned skill for {role} not yet covered in your portfolio.",
-            })
+            weeks.append(
+                {
+                    "week": len(weeks) + 1,
+                    "focus": topic[1],
+                    "topics": topic[2][:4],
+                    "project_idea": (
+                        f"Apply {topic[1]} to `{primary_repo['name'] if primary_repo else 'your main repo'}`."
+                    ),
+                    "reason": f"Role-aligned skill for {role} not yet covered in your portfolio.",
+                }
+            )
         else:
             break
 
     # Phase 3: Integration (week 5)
     if len(weeks) < 5:
         integration_topic = next(topic_iter, None) or (
-            "fullstack_integration", "Full-stack integration", [
+            "fullstack_integration",
+            "Full-stack integration",
+            [
                 "Wire frontend to backend API",
                 "Shared validation and error handling",
                 "Deploy both layers",
-            ]
+            ],
         )
-        weeks.append(_skill_week(
-            objectives[0] if objectives else {"name": "integration", "current": 0, "target": 0.5},
-            integration_topic,
-            primary_repo,
-            5,
-            analysis_report["primary_stack"]["label"],
-        ))
+        weeks.append(
+            _skill_week(
+                objectives[0] if objectives else {"name": "integration", "current": 0, "target": 0.5},
+                integration_topic,
+                primary_repo,
+                5,
+                analysis_report["primary_stack"]["label"],
+            )
+        )
 
     # Phase 4: Capstone (week 6)
     weeks.append(_capstone_week(role, analysis_report, 6))
@@ -507,6 +634,8 @@ def build_roadmap_plan(analysis_report: dict, target_role: str) -> dict:
     weeks = weeks[:6]
     for i, w in enumerate(weeks, start=1):
         w["week"] = i
+        w["completed"] = False
+        w["completed_topics"] = []
 
     return {
         "target_role": target_role,
@@ -525,29 +654,23 @@ async def polish_roadmap_copy(plan: dict, analysis_report: dict, llm) -> dict:
     from services.llm_service import GroqRateLimitError
 
     weeks_json = json.dumps(plan["weeks"], indent=2)
-    repos = ", ".join(
-        r.get("name", "?") for r in analysis_report.get("repo_highlights", [])[:5]
-    )
+    repos = ", ".join(r.get("name", "?") for r in analysis_report.get("repo_highlights", [])[:5])
     prompt = (
         f"You polish roadmap copy for a {plan['target_role']} candidate.\n"
         f"Their repos: {repos}\n"
         f"Stack: {analysis_report.get('primary_stack', {}).get('label')}\n\n"
-        f"Return JSON: {{\"weeks\": [ ... 6 week objects ... ]}}\n"
+        f'Return JSON: {{"weeks": [ ... 6 week objects ... ]}}\n'
         f"Improve ONLY 'reason' and 'project_idea' in each week. "
         f"Keep 'week', 'focus', and 'topics' EXACTLY unchanged.\n\n"
         f"{weeks_json}"
     )
     try:
-        polished = await llm.structured_call(
-            prompt, max_tokens=2500, max_retries=2, try_fallback=True
-        )
+        polished = await llm.structured_call(prompt, max_tokens=2500, max_retries=2, try_fallback=True)
         weeks_list = polished.get("weeks") if isinstance(polished, dict) else polished
         if isinstance(weeks_list, list) and len(weeks_list) == 6:
             for i, week in enumerate(weeks_list):
                 plan["weeks"][i]["reason"] = week.get("reason", plan["weeks"][i]["reason"])
-                plan["weeks"][i]["project_idea"] = week.get(
-                    "project_idea", plan["weeks"][i]["project_idea"]
-                )
+                plan["weeks"][i]["project_idea"] = week.get("project_idea", plan["weeks"][i]["project_idea"])
             plan["polished_by"] = "llm"
     except GroqRateLimitError:
         logger.info("Roadmap polish skipped — Groq rate limited")

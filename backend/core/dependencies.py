@@ -80,9 +80,7 @@ async def get_current_user(
     from sqlalchemy.orm import selectinload
 
     result = await db.execute(
-        select(User)
-        .options(selectinload(User.skill_profiles))
-        .where(User.github_id == github_id)
+        select(User).options(selectinload(User.skill_profiles)).where(User.github_id == github_id)
     )
     user = result.scalar_one_or_none()
 

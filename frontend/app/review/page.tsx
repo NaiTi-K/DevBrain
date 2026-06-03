@@ -17,9 +17,6 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 
 const LANGUAGES = [
   { value: "python", label: "Python" },
-  { value: "javascript", label: "JavaScript" },
-  { value: "typescript", label: "TypeScript" },
-  { value: "go", label: "Go" },
   { value: "java", label: "Java" },
   { value: "cpp", label: "C++" },
 ];
@@ -137,12 +134,164 @@ function ReviewSkeleton() {
   );
 }
 
+function MarkdownRenderer({ content }: { content: string }) {
+  // Normalize literal \n in case backend serialized it poorly
+  const normalized = (content ?? "").replace(/\\n/g, "\n");
+  // Split content by code blocks and normal blocks
+  const parts = normalized.split(/(```[\s\S]*?```)/g);
+  
+  const renderLineContent = (text: string) => {
+    const boldParts = text.split(/(\*\*.*?\*\*)/g);
+    return boldParts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={i} className="font-bold text-white">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
+  return (
+    <div className="space-y-4 text-gray-300 text-sm leading-relaxed review-container">
+      {parts.map((part, i) => {
+        if (part.startsWith("```")) {
+          // Code block
+          const lines = part.split("\n");
+          const firstLine = lines[0] || "```";
+          const lang = firstLine.replace("```", "").trim();
+          const codeContent = lines.slice(1, -1).join("\n");
+          
+          return (
+            <div key={i} className="my-3">
+              {lang && (
+                <div className="text-xs text-gray-500 font-mono mb-1 uppercase tracking-wider">
+                  {lang}
+                </div>
+              )}
+              <pre className="bg-[#0f1117] border border-[#2d3148] rounded-xl p-4 overflow-x-auto font-mono text-xs text-gray-300">
+                <code>{codeContent}</code>
+              </pre>
+            </div>
+          );
+        } else {
+          // Inline formatting like headers, bullet points, checklists
+          const lines = part.split("\n");
+          return (
+            <div key={i} className="space-y-2">
+              {lines.map((line, j) => {
+                const trimmed = line.trim();
+                if (!trimmed) return null;
+                
+                // Headers (## or ###)
+                if (trimmed.startsWith("## ")) {
+                  const title = trimmed.replace("## ", "");
+                  let bg = "rgba(99, 102, 241, 0.08)";
+                  let border = "#6366f1";
+                  
+                  if (title.includes("🧩")) { bg = "rgba(59, 130, 246, 0.08)"; border = "#3b82f6"; }
+                  else if (title.includes("🐛")) { bg = "rgba(239, 68, 68, 0.08)"; border = "#ef4444"; }
+                  else if (title.includes("⏱")) { bg = "rgba(107, 114, 128, 0.08)"; border = "#6b7280"; }
+                  else if (title.includes("💡")) { bg = "rgba(34, 197, 94, 0.08)"; border = "#22c55e"; }
+                  else if (title.includes("🛠")) { bg = "rgba(245, 158, 11, 0.08)"; border = "#f59e0b"; }
+                  else if (title.includes("✅")) { bg = "rgba(16, 185, 129, 0.08)"; border = "#10b981"; }
+                  
+                  return (
+                    <h2
+                      key={j}
+                      className="text-base font-bold text-white mt-6 mb-3 px-4 py-2 rounded-lg border-l-4"
+                      style={{ background: bg, borderLeftColor: border }}
+                    >
+                      {title}
+                    </h2>
+                  );
+                }
+                if (trimmed.startsWith("### ")) {
+                  return (
+                    <h3 key={j} className="text-sm font-semibold text-white mt-4 mb-2">
+                      {trimmed.replace("### ", "")}
+                    </h3>
+                  );
+                }
+
+                // Complexity Highlights
+                if (trimmed.toLowerCase().includes("overall time complexity")) {
+                  const match = trimmed.match(/o\(.+?\)/i) || trimmed.match(/o\(.+\)/i);
+                  const complexity = match ? match[0] : (trimmed.split(/overall time complexity:?/i)[1]?.trim().replace(/\*+/g, "") || "O(?)");
+                  return (
+                    <div key={j} className="my-3 bg-[#6366f1]/10 border border-[#6366f1]/20 rounded-xl px-4 py-3.5 flex items-center justify-between shadow-[0_0_15px_rgba(99,102,241,0.05)]">
+                      <span className="font-semibold text-xs text-[#a5b4fc] uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                        ⏱️ Overall Time Complexity
+                      </span>
+                      <span className="font-mono text-sm font-bold bg-[#6366f1]/30 px-3 py-1 rounded-lg text-white border border-[#6366f1]/40 shadow-[0_0_10px_rgba(99,102,241,0.25)]">
+                        {complexity}
+                      </span>
+                    </div>
+                  );
+                }
+                if (trimmed.toLowerCase().includes("overall space complexity")) {
+                  const match = trimmed.match(/o\(.+?\)/i) || trimmed.match(/o\(.+\)/i);
+                  const complexity = match ? match[0] : (trimmed.split(/overall space complexity:?/i)[1]?.trim().replace(/\*+/g, "") || "O(?)");
+                  return (
+                    <div key={j} className="my-3 bg-[#22c55e]/10 border border-[#22c55e]/20 rounded-xl px-4 py-3.5 flex items-center justify-between shadow-[0_0_15px_rgba(34,197,94,0.05)]">
+                      <span className="font-semibold text-xs text-[#86efac] uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                        💾 Overall Space Complexity
+                      </span>
+                      <span className="font-mono text-sm font-bold bg-[#22c55e]/30 px-3 py-1 rounded-lg text-white border border-[#22c55e]/40 shadow-[0_0_10px_rgba(34,197,94,0.25)]">
+                        {complexity}
+                      </span>
+                    </div>
+                  );
+                }
+                
+                // Checkboxes / checklists
+                if (trimmed.startsWith("- [x]") || trimmed.startsWith("- [ ]")) {
+                  const checked = trimmed.startsWith("- [x]");
+                  const text = trimmed.substring(5).trim();
+                  return (
+                    <div key={j} className="flex items-center gap-2 text-sm text-gray-300 py-0.5">
+                      <span className={checked ? "text-[#22c55e]" : "text-gray-500 font-bold"}>
+                        {checked ? "☑" : "☐"}
+                      </span>
+                      <span>{text}</span>
+                    </div>
+                  );
+                }
+
+                // Bullet points
+                if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+                  return (
+                    <div key={j} className="flex gap-2 text-sm text-gray-300 ml-4 py-0.5">
+                      <span className="text-[#6366f1]">•</span>
+                      <span>{renderLineContent(trimmed.substring(2))}</span>
+                    </div>
+                  );
+                }
+                
+                // Severity tags or bold text color highlights
+                let contentEl: React.ReactNode = renderLineContent(trimmed);
+                if (trimmed.includes("🔴 Critical")) {
+                  contentEl = <span className="text-red-400 font-medium">{renderLineContent(trimmed)}</span>;
+                } else if (trimmed.includes("🟡 Warning")) {
+                  contentEl = <span className="text-yellow-400 font-medium">{renderLineContent(trimmed)}</span>;
+                } else if (trimmed.includes("🔵 Info")) {
+                  contentEl = <span className="text-blue-400 font-medium">{renderLineContent(trimmed)}</span>;
+                }
+                
+                return <p key={j} className="text-sm text-gray-300 leading-relaxed">{contentEl}</p>;
+              })}
+            </div>
+          );
+        }
+      })}
+    </div>
+  );
+}
+
 export default function ReviewPage() {
   const router = useRouter();
   const [code, setCode] = useState(STARTER.python);
   const [language, setLanguage] = useState("python");
   const [context, setContext] = useState("");
-  const [review, setReview] = useState<CodeReview | null>(null);
+  const [review, setReview] = useState<any | null>(null);
   const [streamText, setStreamText] = useState("");
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -150,7 +299,26 @@ export default function ReviewPage() {
   const streamRef = useRef<ReturnType<typeof streamCodeReview> | null>(null);
 
   useEffect(() => {
-    if (!localStorage.getItem("devbrain_token")) router.push("/");
+    if (!localStorage.getItem("devbrain_token")) {
+      router.push("/");
+      return;
+    }
+    const prefillCode = sessionStorage.getItem("review_prefill_code");
+    const prefillLang = sessionStorage.getItem("review_prefill_language");
+    const prefillCtx = sessionStorage.getItem("review_prefill_context");
+    
+    if (prefillCode) {
+      setCode(prefillCode);
+      sessionStorage.removeItem("review_prefill_code");
+    }
+    if (prefillLang) {
+      setLanguage(prefillLang);
+      sessionStorage.removeItem("review_prefill_language");
+    }
+    if (prefillCtx) {
+      setContext(prefillCtx);
+      sessionStorage.removeItem("review_prefill_context");
+    }
   }, [router]);
 
   const handleFullReview = async () => {
@@ -194,11 +362,6 @@ export default function ReviewPage() {
     setLanguage(lang);
     setCode(STARTER[lang] ?? "");
   };
-
-  const annotations = review?.annotations ?? [];
-  const edgeCases = review?.edge_cases ?? [];
-  const improvements = review?.improvements ?? [];
-  const bestPractices = review?.best_practices ?? [];
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 h-[calc(100vh-4rem)] flex flex-col gap-4">
@@ -318,174 +481,58 @@ export default function ReviewPage() {
             </div>
           )}
 
-          {(loading) && <ReviewSkeleton />}
+          {loading && <ReviewSkeleton />}
 
           {streaming && (
-            <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-5 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse" />
-                <span className="text-[#6366f1] text-sm font-medium">
-                  Live Stream
+            <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-6 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+              <div className="flex items-center gap-2 mb-4 border-b border-[#2d3148] pb-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#6366f1] animate-pulse" />
+                <span className="text-[#6366f1] text-xs font-semibold uppercase tracking-wider">
+                  Live Stream Reviewing
                 </span>
               </div>
-              <pre className="text-gray-300 text-sm whitespace-pre-wrap font-mono leading-relaxed">
-                {streamText}
-                <span className="animate-pulse">▌</span>
-              </pre>
+              <MarkdownRenderer content={streamText} />
             </div>
           )}
 
           {!streaming && streamText && !review && (
-            <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-5 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
-              <p className="text-gray-400 text-xs uppercase tracking-widest mb-3">
-                Stream Result
-              </p>
-              <pre className="text-gray-300 text-sm whitespace-pre-wrap font-mono leading-relaxed">
-                {streamText}
-              </pre>
+            <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-6 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+              <div className="text-gray-400 text-xs uppercase tracking-wider mb-4 border-b border-[#2d3148] pb-3 font-semibold">
+                Streaming Review Complete
+              </div>
+              <MarkdownRenderer content={streamText} />
             </div>
           )}
 
           {review && (
-            <>
-              {/* Score + Reflection */}
-              <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-5 shadow-[0_0_15px_rgba(99,102,241,0.1)] flex items-start gap-4 flex-wrap">
-                <ScoreBadge score={review.score} />
-                <div className="flex-1 min-w-[150px]">
-                  <p className="text-white font-semibold text-sm mb-1">
-                    Quality Score
-                  </p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    {review.complexity?.time && (
-                      <span className="text-xs bg-[#6366f122] text-[#6366f1] px-2 py-1 rounded-full">
-                        ⏱ {review.complexity.time}
-                      </span>
-                    )}
-                    {review.complexity?.space && (
-                      <span className="text-xs bg-[#22c55e22] text-[#22c55e] px-2 py-1 rounded-full">
-                        💾 {review.complexity.space}
+            <div className="space-y-4">
+              {/* Pre-Analysis Hints */}
+              {review.hints && (
+                <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-4 shadow-[0_0_15px_rgba(99,102,241,0.1)] flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs bg-[#6366f122] text-[#6366f1] px-2.5 py-1 rounded-full font-semibold">
+                      Lines: {review.lines}
+                    </span>
+                    <span className="text-xs bg-[#22c55e22] text-[#22c55e] px-2.5 py-1 rounded-full font-semibold">
+                      Max Nesting Loop: {review.hints.loop_depth}
+                    </span>
+                    {review.hints.has_recursion && (
+                      <span className="text-xs bg-[#ef444422] text-[#ef4444] px-2.5 py-1 rounded-full font-semibold">
+                        Recursion Detected
                       </span>
                     )}
                   </div>
+                  <span className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
+                    v3.0 Reviewer
+                  </span>
                 </div>
+              )}
+
+              {/* Main Review Body */}
+              <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-6 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                <MarkdownRenderer content={review.review} />
               </div>
-
-              {/* Pre-Computed Facts */}
-              {(review.ast_facts || review.lint_facts) && (
-                <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-5 shadow-[0_0_15px_rgba(99,102,241,0.1)] flex gap-4 overflow-x-auto">
-                  {review.ast_facts && (
-                    <div className="flex-1 min-w-[250px]">
-                      <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">AST Analysis</p>
-                      <pre className="text-xs text-gray-300 bg-[#0f1117] p-2 rounded-lg">{JSON.stringify(review.ast_facts, null, 2)}</pre>
-                    </div>
-                  )}
-                  {review.lint_facts && (
-                    <div className="flex-1 min-w-[250px]">
-                      <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">Linter Report</p>
-                      <pre className="text-xs text-gray-300 bg-[#0f1117] p-2 rounded-lg">{JSON.stringify(review.lint_facts, null, 2)}</pre>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Summary */}
-              {review.summary && (
-                <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl p-5 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
-                  <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">
-                    Summary
-                  </p>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    {review.summary}
-                  </p>
-                </div>
-              )}
-
-              {/* Annotations */}
-              {annotations.length > 0 && (
-                <Collapsible
-                  title={`📌 Annotations (${annotations.length})`}
-                  defaultOpen
-                >
-                  <div className="space-y-2">
-                    {annotations.map((a: any, i: number) => (
-                      <div
-                        key={i}
-                        className="flex gap-3 text-sm"
-                      >
-                        {a.line != null && (
-                          <span className="text-[#6366f1] font-mono text-xs mt-0.5 shrink-0">
-                            L{a.line}
-                          </span>
-                        )}
-                        <span className="text-gray-300">{a.message}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Collapsible>
-              )}
-
-              {/* Edge Cases */}
-              {edgeCases.length > 0 && (
-                <Collapsible title={`⚠️ Edge Cases (${edgeCases.length})`}>
-                  <ul className="space-y-1.5">
-                    {edgeCases.map((e: string, i) => (
-                      <li key={i} className="text-gray-300 text-sm flex gap-2">
-                        <span className="text-[#f59e0b] shrink-0">•</span>
-                        {e}
-                      </li>
-                    ))}
-                  </ul>
-                </Collapsible>
-              )}
-
-              {/* Improvements */}
-              {improvements.length > 0 && (
-                <Collapsible
-                  title={`🚀 Improvements (${improvements.length})`}
-                >
-                  <div className="space-y-4">
-                    {improvements.map(
-                      (
-                        imp: any,
-                        i
-                      ) => (
-                        <div key={i}>
-                          <p className="text-gray-300 text-sm mb-2">
-                            {imp.description}
-                          </p>
-                          {imp.code_after && (
-                            <pre className="bg-[#0f1117] border border-[#2d3148] rounded-lg p-3 text-xs font-mono text-gray-300 overflow-x-auto">
-                              {imp.code_after}
-                            </pre>
-                          )}
-                          {imp.verification && (
-                            <div className={`mt-2 px-3 py-2 rounded-lg border text-sm flex gap-2 ${imp.verification.verified ? 'bg-[#22c55e11] border-[#22c55e55] text-[#22c55e]' : 'bg-[#ef444411] border-[#ef444455] text-[#ef4444]'}`}>
-                              <strong>{imp.verification.badge}</strong>: {imp.verification.message}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    )}
-                  </div>
-                </Collapsible>
-              )}
-
-              {/* Best Practices */}
-              {bestPractices.length > 0 && (
-                <Collapsible
-                  title={`✅ Best Practices (${bestPractices.length})`}
-                >
-                  <ul className="space-y-1.5">
-                    {bestPractices.map((b: string, i) => (
-                      <li key={i} className="text-gray-300 text-sm flex gap-2">
-                        <span className="text-[#22c55e] shrink-0">✓</span>
-                        {b}
-                      </li>
-                    ))}
-                  </ul>
-                </Collapsible>
-              )}
-            </>
+            </div>
           )}
         </div>
       </div>

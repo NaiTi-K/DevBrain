@@ -24,11 +24,13 @@ from api.routes.review import router as review_router
 from api.routes.interview import router as interview_router
 from api.routes.resources import router as resources_router
 from api.routes.progress import router as progress_router
+from code_reviewer.review_routes import router as code_reviewer_router
 from core.config import settings
 from models.database import Base, engine
 
 
 # ── Application lifespan ──────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -76,6 +78,7 @@ logger = logging.getLogger("devbrain")
 # so the browser console shows the real message instead of a misleading
 # "CORS policy" error.
 
+
 @app.exception_handler(Exception)
 async def _global_exception_handler(request: Request, exc: Exception):
     tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
@@ -88,17 +91,19 @@ async def _global_exception_handler(request: Request, exc: Exception):
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-app.include_router(auth_router,       prefix="/auth")
-app.include_router(github_router,     prefix="/github")
-app.include_router(roadmap_router,    prefix="/roadmap")
+app.include_router(auth_router, prefix="/auth")
+app.include_router(github_router, prefix="/github")
+app.include_router(roadmap_router, prefix="/roadmap")
 app.include_router(challenges_router, prefix="/challenges")
-app.include_router(review_router,     prefix="/review")
-app.include_router(interview_router,  prefix="/interview")
-app.include_router(resources_router,  prefix="/resources")
-app.include_router(progress_router,   prefix="/progress")
+app.include_router(review_router, prefix="/review")
+app.include_router(interview_router, prefix="/interview")
+app.include_router(resources_router, prefix="/resources")
+app.include_router(progress_router, prefix="/progress")
+app.include_router(code_reviewer_router, prefix="/code-reviewer", tags=["code-reviewer"])
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
+
 
 @app.get("/health", tags=["meta"], summary="Service health check")
 async def health():

@@ -35,6 +35,7 @@ class SearchService:
         Each item: {"title": str, "url": str, "content": str, "score": float}
         Results with score < 0.3 are discarded.
         """
+
         def _sync_search():
             response = self.client.search(
                 query=query,

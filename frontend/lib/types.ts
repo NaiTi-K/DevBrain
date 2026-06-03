@@ -85,6 +85,7 @@ export interface Roadmap {
   focus_areas: string[];
   generated_at: string;
   updated_at: string;
+  plan: any;
 }
 
 export interface GenerateRoadmapRequest {
@@ -305,6 +306,21 @@ export interface DailyActivity {
   total_activity: number;
 }
 
+export interface RoadmapTracker {
+  id: string;
+  target_role: string;
+  total_weeks: number;
+  completed_weeks: number;
+  percent_completed: number;
+  total_topics: number;
+  completed_topics: number;
+}
+
+export interface TrendPoint {
+  date: string;
+  score: number;
+}
+
 export interface ProgressDashboard {
   user: User;
   streak: StreakInfo;
@@ -320,6 +336,10 @@ export interface ProgressDashboard {
   recent_activity?: any[];
   weekly_challenge_goal: number;
   weekly_challenges_done: number;
+  roadmap_tracker?: RoadmapTracker | null;
+  exam_readiness?: Record<string, number>;
+  weekly_digest?: string;
+  trend_data?: TrendPoint[];
 }
 
 // ---------------------------------------------------------------------------

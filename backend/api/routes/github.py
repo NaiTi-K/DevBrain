@@ -113,9 +113,7 @@ async def analyze_github(
     analyzed_at = datetime.utcnow()
 
     # Persist on the request DB session so GET /github/profile sees the row immediately.
-    result = await db.execute(
-        select(SkillProfile).where(SkillProfile.user_id == current_user.id)
-    )
+    result = await db.execute(select(SkillProfile).where(SkillProfile.user_id == current_user.id))
     profile = result.scalar_one_or_none()
     if profile:
         profile.skills = skills

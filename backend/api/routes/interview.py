@@ -27,6 +27,7 @@ from models.interview import InterviewSession
 from models.user import User
 from agents.orchestrator import DevBrainState
 from agents.interview_agent import interview_agent_node
+from services.cache_service import cache
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["interview"])
@@ -86,14 +87,12 @@ class InterviewHistoryItem(BaseModel):
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _extract_skill_profile(user: User) -> dict:
     try:
         if user and hasattr(user, "skill_profile") and user.skill_profile:
             raw = getattr(user.skill_profile, "skills", {}) or {}
-            return {
-                k: float(v.get("score", v) if isinstance(v, dict) else v)
-                for k, v in raw.items()
-            }
+            return {k: float(v.get("score", v) if isinstance(v, dict) else v) for k, v in raw.items()}
     except Exception:
         pass
     return {}
@@ -229,6 +228,7 @@ async def start_interview(
         db.add(db_session)
         await db.commit()
         await db.refresh(db_session)
+        await cache.delete_progress_dashboard(str(current_user.id))
     except Exception as exc:
         logger.error("Failed to persist new interview session: %s", exc)
         await db.rollback()
@@ -326,6 +326,7 @@ async def send_message(
         flag_modified(db_session, "topics_covered")
 
         await db.commit()
+        await cache.delete_progress_dashboard(str(current_user.id))
     except Exception as exc:
         logger.error("Failed to update interview session %s: %s", session_id, exc)
         await db.rollback()

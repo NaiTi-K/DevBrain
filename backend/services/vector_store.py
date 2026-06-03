@@ -23,9 +23,7 @@ class VectorStoreService:
             path="./data/chroma",
             settings=ChromaSettings(anonymized_telemetry=False),
         )
-        self._emb_fn = SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        self._emb_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
         _cosine = {"hnsw:space": "cosine"}
 
         self.code_collection = self._client.get_or_create_collection(
@@ -60,6 +58,7 @@ class VectorStoreService:
     ) -> None:
         """Store a code review for future similarity search."""
         document = f"{language} code: {code[:500]}\nReview: {review_summary}"
+
         def _add():
             self.code_collection.add(
                 ids=[review_id],
@@ -72,6 +71,7 @@ class VectorStoreService:
                     }
                 ],
             )
+
         await asyncio.to_thread(_add)
 
     async def search_similar_reviews(
@@ -85,12 +85,14 @@ class VectorStoreService:
         Each item: {"document": str, "metadata": dict, "distance": float}
         """
         query = f"{language} code: {code[:500]}"
+
         def _query():
             results = self.code_collection.query(
                 query_texts=[query],
                 n_results=n_results,
             )
             return self._zip_results(results)
+
         return await asyncio.to_thread(_query)
 
     # ------------------------------------------------------------------
@@ -109,6 +111,7 @@ class VectorStoreService:
     ) -> None:
         """Index a learning resource."""
         document = f"{title}: {description}"
+
         def _add():
             self.resource_collection.add(
                 ids=[resource_id],
@@ -123,6 +126,7 @@ class VectorStoreService:
                     }
                 ],
             )
+
         await asyncio.to_thread(_add)
 
     async def search_resources(
@@ -154,10 +158,12 @@ class VectorStoreService:
                 }
                 for r in rows
             ]
+
         return await asyncio.to_thread(_query)
 
     async def list_resource_topics(self) -> list[str]:
         """Retrieve unique topics indexed in the resource collection."""
+
         def _get():
             results = self.resource_collection.get(include=["metadatas"])
             metadatas = results.get("metadatas") or []
@@ -166,6 +172,7 @@ class VectorStoreService:
                 if meta and "topic" in meta:
                     topics.add(meta["topic"])
             return list(topics)
+
         return await asyncio.to_thread(_get)
 
     # ------------------------------------------------------------------
@@ -180,6 +187,7 @@ class VectorStoreService:
         session_type: str,
     ) -> None:
         """Persist a session turn for long-term user context."""
+
         def _add():
             self.session_collection.add(
                 ids=[session_id],
@@ -191,6 +199,7 @@ class VectorStoreService:
                     }
                 ],
             )
+
         await asyncio.to_thread(_add)
 
     async def get_user_context(
@@ -203,6 +212,7 @@ class VectorStoreService:
         Retrieve the most relevant session snippets for a user.
         Returns a list of plain document strings.
         """
+
         def _query():
             results = self.session_collection.query(
                 query_texts=[query],
@@ -211,6 +221,7 @@ class VectorStoreService:
             )
             rows = self._zip_results(results)
             return [r["document"] for r in rows]
+
         return await asyncio.to_thread(_query)
 
     # ------------------------------------------------------------------
@@ -237,7 +248,6 @@ class VectorStoreService:
                 }
             )
         return output
-
 
 
 # ---------------------------------------------------------------------------

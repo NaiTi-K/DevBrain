@@ -93,31 +93,30 @@ def compute_strengths(
 
     for lang, score in _meaningful_skills(skills)[:5]:
         if score >= PROFICIENT_THRESHOLD:
-            strengths.append({
-                "category": "language",
-                "name": lang,
-                "score": score,
-                "tier": _skill_tier(score),
-                "evidence": f"Language score {score:.0%} across analyzed repos",
-            })
+            strengths.append(
+                {
+                    "category": "language",
+                    "name": lang,
+                    "score": score,
+                    "tier": _skill_tier(score),
+                    "evidence": f"Language score {score:.0%} across analyzed repos",
+                }
+            )
 
     for fw, score in sorted(frameworks.items(), key=lambda x: x[1], reverse=True):
         if score >= 0.70:
-            repos_using = [
-                r["name"] for r in repo_highlights
-                if fw in (r.get("frameworks") or [])
-            ]
-            strengths.append({
-                "category": "framework",
-                "name": fw,
-                "score": score,
-                "tier": "proficient",
-                "evidence": (
-                    f"Detected in {', '.join(repos_using)}"
-                    if repos_using
-                    else "Found in dependency manifests"
-                ),
-            })
+            repos_using = [r["name"] for r in repo_highlights if fw in (r.get("frameworks") or [])]
+            strengths.append(
+                {
+                    "category": "framework",
+                    "name": fw,
+                    "score": score,
+                    "tier": "proficient",
+                    "evidence": (
+                        f"Detected in {', '.join(repos_using)}" if repos_using else "Found in dependency manifests"
+                    ),
+                }
+            )
 
     for repo in repo_highlights:
         name = repo.get("name", "?")
@@ -129,22 +128,26 @@ def compute_strengths(
         if repo.get("stars", 0) >= 5:
             flags.append(f"{repo['stars']} stars")
         if flags:
-            strengths.append({
-                "category": "repo",
-                "name": name,
-                "score": 1.0,
-                "tier": "standout",
-                "evidence": f"{name}: {', '.join(flags)}",
-            })
+            strengths.append(
+                {
+                    "category": "repo",
+                    "name": name,
+                    "score": 1.0,
+                    "tier": "standout",
+                    "evidence": f"{name}: {', '.join(flags)}",
+                }
+            )
 
     if ep.get("has_cicd"):
-        strengths.append({
-            "category": "practice",
-            "name": "CI/CD",
-            "score": 1.0,
-            "tier": "proficient",
-            "evidence": "At least one repo has GitHub Actions or equivalent",
-        })
+        strengths.append(
+            {
+                "category": "practice",
+                "name": "CI/CD",
+                "score": 1.0,
+                "tier": "proficient",
+                "evidence": "At least one repo has GitHub Actions or equivalent",
+            }
+        )
 
     return strengths
 
@@ -159,51 +162,58 @@ def compute_gaps(
     gaps: list[dict] = []
 
     if not ep.get("has_cicd"):
-        gaps.append({
-            "id": "practice_cicd",
-            "category": "practice",
-            "severity": "critical",
-            "title": "No CI/CD pipeline detected",
-            "detail": "None of your top repos run automated builds or tests on push.",
-            "action": "Add GitHub Actions workflow to your most active repo",
-        })
+        gaps.append(
+            {
+                "id": "practice_cicd",
+                "category": "practice",
+                "severity": "critical",
+                "title": "No CI/CD pipeline detected",
+                "detail": "None of your top repos run automated builds or tests on push.",
+                "action": "Add GitHub Actions workflow to your most active repo",
+            }
+        )
 
     test_signal = float(ep.get("test_signal", 0.0))
     if test_signal < 0.4:
         sev = "critical" if test_signal < 0.2 else "high"
-        gaps.append({
-            "id": "practice_testing",
-            "category": "practice",
-            "severity": sev,
-            "title": "Weak automated testing signal",
-            "detail": f"Only {test_signal:.0%} of top repos expose a tests/ directory.",
-            "action": "Add pytest or Jest tests to a production repo",
-        })
+        gaps.append(
+            {
+                "id": "practice_testing",
+                "category": "practice",
+                "severity": sev,
+                "title": "Weak automated testing signal",
+                "detail": f"Only {test_signal:.0%} of top repos expose a tests/ directory.",
+                "action": "Add pytest or Jest tests to a production repo",
+            }
+        )
 
     commit_q = float(ep.get("commit_quality", 0.0))
     if commit_q < 0.35:
-        gaps.append({
-            "id": "practice_commits",
-            "category": "practice",
-            "severity": "high",
-            "title": "Low commit message hygiene",
-            "detail": (
-                f"Commit quality score {commit_q:.0%} — messages lack conventional format "
-                "or descriptive detail."
-            ),
-            "action": "Adopt Conventional Commits (feat:, fix:, chore:) with meaningful bodies",
-        })
+        gaps.append(
+            {
+                "id": "practice_commits",
+                "category": "practice",
+                "severity": "high",
+                "title": "Low commit message hygiene",
+                "detail": (
+                    f"Commit quality score {commit_q:.0%} — messages lack conventional format or descriptive detail."
+                ),
+                "action": "Adopt Conventional Commits (feat:, fix:, chore:) with meaningful bodies",
+            }
+        )
 
     avg_cc = float(ep.get("avg_complexity", 0.0))
     if avg_cc > 10:
-        gaps.append({
-            "id": "practice_complexity",
-            "category": "practice",
-            "severity": "high" if avg_cc > 20 else "medium",
-            "title": f"High cyclomatic complexity ({avg_cc:.1f})",
-            "detail": f"Average Python CC is {_complexity_label(avg_cc)} (target ≤10).",
-            "action": "Extract functions, reduce nesting in your largest Python modules",
-        })
+        gaps.append(
+            {
+                "id": "practice_complexity",
+                "category": "practice",
+                "severity": "high" if avg_cc > 20 else "medium",
+                "title": f"High cyclomatic complexity ({avg_cc:.1f})",
+                "detail": f"Average Python CC is {_complexity_label(avg_cc)} (target ≤10).",
+                "action": "Extract functions, reduce nesting in your largest Python modules",
+            }
+        )
 
     for repo in repo_highlights:
         name = repo.get("name", "?")
@@ -218,32 +228,33 @@ def compute_gaps(
             missing.append("declared dependencies")
 
         if missing:
-            gaps.append({
-                "id": f"repo_{name}",
-                "category": "repo",
-                "severity": "high" if len(missing) >= 2 else "medium",
-                "title": f"{name} lacks {', '.join(missing)}",
-                "detail": (
-                    f"{name} ({repo.get('primary_language', '?')}) — "
-                    f"{repo.get('stars', 0)} stars"
-                ),
-                "action": f"Harden {name}: add {missing[0]} first",
-                "repo": name,
-            })
+            gaps.append(
+                {
+                    "id": f"repo_{name}",
+                    "category": "repo",
+                    "severity": "high" if len(missing) >= 2 else "medium",
+                    "title": f"{name} lacks {', '.join(missing)}",
+                    "detail": (f"{name} ({repo.get('primary_language', '?')}) — {repo.get('stars', 0)} stars"),
+                    "action": f"Harden {name}: add {missing[0]} first",
+                    "repo": name,
+                }
+            )
 
     langs = _meaningful_skills(skills)
     if langs:
         primary = langs[0][0]
         for lang, score in langs[3:]:
             if score < 0.15 and lang not in (primary,):
-                gaps.append({
-                    "id": f"lang_{lang.lower()}",
-                    "category": "language",
-                    "severity": "low",
-                    "title": f"Minimal {lang} footprint",
-                    "detail": f"{lang} score {score:.0%} vs primary {primary} {langs[0][1]:.0%}",
-                    "action": f"Either deepen {lang} or remove dead code paths using it",
-                })
+                gaps.append(
+                    {
+                        "id": f"lang_{lang.lower()}",
+                        "category": "language",
+                        "severity": "low",
+                        "title": f"Minimal {lang} footprint",
+                        "detail": f"{lang} score {score:.0%} vs primary {primary} {langs[0][1]:.0%}",
+                        "action": f"Either deepen {lang} or remove dead code paths using it",
+                    }
+                )
 
     gaps.sort(key=lambda g: SEVERITY_ORDER.get(g["severity"], 9))
     return gaps
@@ -278,15 +289,17 @@ def compute_priority_repos(repo_highlights: list[dict]) -> list[dict]:
             actions.append("add CI/CD workflow")
         if not repo.get("description"):
             actions.append("write README")
-        result.append({
-            "priority": priority,
-            "name": repo.get("name"),
-            "language": repo.get("primary_language"),
-            "stars": repo.get("stars", 0),
-            "frameworks": repo.get("frameworks") or [],
-            "improvement_score": score,
-            "recommended_actions": actions,
-        })
+        result.append(
+            {
+                "priority": priority,
+                "name": repo.get("name"),
+                "language": repo.get("primary_language"),
+                "stars": repo.get("stars", 0),
+                "frameworks": repo.get("frameworks") or [],
+                "improvement_score": score,
+                "recommended_actions": actions,
+            }
+        )
     return result
 
 
@@ -306,11 +319,7 @@ def build_analysis_report(profile_data: dict, github_username: str) -> dict:
     priority_repos = compute_priority_repos(repo_highlights)
     maturity = compute_maturity_score(ep)
 
-    skill_tiers = {
-        lang: _skill_tier(score)
-        for lang, score in skills.items()
-        if score >= MIN_MEANINGFUL_SKILL
-    }
+    skill_tiers = {lang: _skill_tier(score) for lang, score in skills.items() if score >= MIN_MEANINGFUL_SKILL}
 
     return {
         "github_username": github_username,
@@ -324,9 +333,12 @@ def build_analysis_report(profile_data: dict, github_username: str) -> dict:
         "engineering_practices": ep,
         "maturity_score": maturity,
         "maturity_label": (
-            "senior-ready" if maturity >= 0.75
-            else "mid-level" if maturity >= 0.50
-            else "junior" if maturity >= 0.30
+            "senior-ready"
+            if maturity >= 0.75
+            else "mid-level"
+            if maturity >= 0.50
+            else "junior"
+            if maturity >= 0.30
             else "early-career"
         ),
         "strengths": strengths,
@@ -355,9 +367,7 @@ def render_analysis_markdown(report: dict) -> str:
 
     strength_lines: list[str] = []
     if lang_strengths:
-        langs = ", ".join(
-            f"**{s['name']}** ({s['score']:.0%}, {s['tier']})" for s in lang_strengths
-        )
+        langs = ", ".join(f"**{s['name']}** ({s['score']:.0%}, {s['tier']})" for s in lang_strengths)
         strength_lines.append(f"- **Languages:** {langs}")
     if fw_strengths:
         fws = ", ".join(f"**{s['name']}**" for s in fw_strengths)
@@ -367,10 +377,7 @@ def render_analysis_markdown(report: dict) -> str:
 
     for repo in report["repo_highlights"][:4]:
         fw = ", ".join(repo.get("frameworks") or []) or "no manifest detected"
-        strength_lines.append(
-            f"- `{repo.get('name')}` ({repo.get('primary_language')}, "
-            f"{repo.get('stars', 0)}★): {fw}"
-        )
+        strength_lines.append(f"- `{repo.get('name')}` ({repo.get('primary_language')}, {repo.get('stars', 0)}★): {fw}")
 
     # Practices section
     ep = report["engineering_practices"]
@@ -378,10 +385,7 @@ def render_analysis_markdown(report: dict) -> str:
     commit_samples = "\n".join(f'  - "{c}"' for c in commits[:4]) or "  - (none fetched)"
 
     # Gaps section
-    gap_lines = [
-        f"- **[{g['severity'].upper()}]** {g['title']}: {g['action']}"
-        for g in report["gaps"][:6]
-    ]
+    gap_lines = [f"- **[{g['severity'].upper()}]** {g['title']}: {g['action']}" for g in report["gaps"][:6]]
 
     # Roadmap focus
     priority = report["priority_repos"][0] if report["priority_repos"] else None
@@ -406,8 +410,7 @@ def render_analysis_markdown(report: dict) -> str:
         inventory_note = f" ({', '.join(parts)})"
 
     deep_scan_note = (
-        f"**Deep-scanned ({len(deep_scanned)}):** "
-        + ", ".join(f"`{n}`" for n in deep_scanned)
+        f"**Deep-scanned ({len(deep_scanned)}):** " + ", ".join(f"`{n}`" for n in deep_scanned)
         if deep_scanned
         else "**Deep scan:** top repos by code size & recent activity"
     )

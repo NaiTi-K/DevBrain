@@ -6,8 +6,7 @@ All external services (LLM, GitHub, vector store, DB queries) are mocked
 so no real network calls or heavy dependencies are needed.
 """
 
-import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -17,8 +16,8 @@ from httpx import AsyncClient
 # 1. Health check
 # ===========================================================================
 
-class TestHealth:
 
+class TestHealth:
     @pytest.mark.asyncio
     async def test_health_check(self, async_client: AsyncClient):
         response = await async_client.get("/health")
@@ -31,8 +30,8 @@ class TestHealth:
 # 2-4. Auth routes
 # ===========================================================================
 
-class TestAuthRoutes:
 
+class TestAuthRoutes:
     @pytest.mark.asyncio
     async def test_auth_login_returns_url(self, async_client: AsyncClient):
         """GET /auth/login should redirect or return a GitHub OAuth URL."""
@@ -69,8 +68,8 @@ class TestAuthRoutes:
 # 5-6. GitHub routes
 # ===========================================================================
 
-class TestGitHubRoutes:
 
+class TestGitHubRoutes:
     @pytest.mark.asyncio
     async def test_github_analyze_requires_auth(self, async_client: AsyncClient):
         response = await async_client.post("/github/analyze")
@@ -144,7 +143,6 @@ MOCK_REVIEW_STATE = {
 
 
 class TestReviewRoutes:
-
     @pytest.mark.asyncio
     async def test_review_submit_requires_auth(self, async_client: AsyncClient):
         response = await async_client.post(
@@ -194,8 +192,8 @@ class TestReviewRoutes:
 # 10-11. Resources routes
 # ===========================================================================
 
-class TestResourceRoutes:
 
+class TestResourceRoutes:
     @pytest.mark.asyncio
     async def test_resources_search_requires_auth(self, async_client: AsyncClient):
         response = await async_client.get("/resources/search?topic=python")
@@ -248,7 +246,6 @@ MOCK_DASHBOARD = {
 
 
 class TestProgressRoutes:
-
     @pytest.mark.asyncio
     async def test_progress_dashboard_requires_auth(self, async_client: AsyncClient):
         response = await async_client.get("/progress/dashboard")
@@ -265,12 +262,62 @@ class TestProgressRoutes:
     ):
         mock_progress_fn.return_value = {
             "structured_output": {
-                "skill_delta_7d": {"Python": 0.12, "SQL": 0.08},
-                "skill_delta_30d": {"Python": 0.25, "SQL": 0.15},
-                "streak": 7,
-                "exam_readiness": {"Python": 68},
-                "challenge_pass_rate": 0.85,
+                "user": {
+                    "id": str(mock_user.id),
+                    "github_id": mock_user.github_id,
+                    "username": mock_user.github_username,
+                    "email": None,
+                    "avatar_url": mock_user.avatar_url,
+                    "name": mock_user.display_name,
+                    "created_at": "2026-06-03T18:15:13",
+                    "updated_at": "2026-06-03T18:15:13",
+                },
+                "streak": {
+                    "current_streak": 7,
+                    "longest_streak": 10,
+                    "last_activity_date": "2026-06-03",
+                },
+                "skill_profile": {
+                    "user_id": str(mock_user.id),
+                    "github_username": mock_user.github_username,
+                    "skills": {"Python": 0.80, "SQL": 0.60},
+                    "summary": "Looks good",
+                    "repo_count": 5,
+                    "analyzed_at": "2026-06-03T18:15:13",
+                },
+                "skill_deltas": [
+                    {
+                        "skill": "Python",
+                        "delta_7d": 0.12,
+                        "delta_30d": 0.25,
+                        "current_score": 0.80,
+                    }
+                ],
+                "total_challenges_solved": 5,
+                "total_reviews_submitted": 3,
+                "total_interview_sessions": 2,
+                "exam_readiness_score": 0.75,
+                "exam_readiness": {"Python": 75},
                 "weekly_digest": "Great progress this week!",
+                "daily_activity": [
+                    {
+                        "date": "2026-06-03",
+                        "challenges_solved": 1,
+                        "reviews_submitted": 1,
+                        "interview_sessions": 0,
+                        "total_activity": 2,
+                    }
+                ],
+                "trend_data": [{"date": "2026-06-03", "score": 75.0}],
+                "weekly_challenge_goal": 5,
+                "weekly_challenges_done": 2,
+                "roadmap_tracker": {
+                    "id": "11111111-1111-1111-1111-111111111111",
+                    "target_role": "Backend Engineer",
+                    "total_weeks": 6,
+                    "completed_weeks": 2,
+                    "percent_completed": 0.33,
+                },
             }
         }
         response = await async_client.get(
@@ -280,4 +327,5 @@ class TestProgressRoutes:
         assert response.status_code == 200
         body = response.json()
         assert "streak" in body
-        assert isinstance(body["streak"], int)
+        assert isinstance(body["streak"], dict)
+        assert body["streak"]["current_streak"] == 7

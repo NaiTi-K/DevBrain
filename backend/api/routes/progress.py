@@ -18,10 +18,17 @@ from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from agents.progress_agent import progress_agent_node
+from agents.progress_agent import progress_agent_node, _calculate_consecutive_streaks
+from agents.github_analyzer import SkillProfileResponse
+from api.routes.auth import UserResponse
 from core.dependencies import get_current_user, get_db
-from models.progress import ProgressSnapshot
-from models.user import User
+from models import (
+    User,
+    ProgressSnapshot,
+    ChallengeAttempt,
+    CodeReview,
+    InterviewSession,
+)
 from services.cache_service import cache
 
 logger = logging.getLogger(__name__)
@@ -31,13 +38,58 @@ router = APIRouter(tags=["progress"])
 # ── Response schemas ──────────────────────────────────────────────────────
 
 
+class StreakInfo(BaseModel):
+    current_streak: int
+    longest_streak: int
+    last_activity_date: Optional[date] = None
+
+
+class SkillDelta(BaseModel):
+    skill: str
+    delta_7d: float
+    delta_30d: float
+    current_score: float
+
+
+class DailyActivity(BaseModel):
+    date: str  # YYYY-MM-DD
+    challenges_solved: int
+    reviews_submitted: int
+    interview_sessions: int
+    total_activity: int
+
+
+class TrendPoint(BaseModel):
+    date: str  # YYYY-MM-DD
+    score: float
+
+
+class RoadmapTracker(BaseModel):
+    id: str
+    target_role: str
+    total_weeks: int
+    completed_weeks: int
+    percent_completed: float
+    total_topics: int = 0
+    completed_topics: int = 0
+
+
 class DashboardResponse(BaseModel):
-    skill_delta_7d: dict[str, float]
-    skill_delta_30d: dict[str, float]
-    streak: int
+    user: UserResponse
+    streak: StreakInfo
+    skill_profile: Optional[SkillProfileResponse] = None
+    skill_deltas: list[SkillDelta]
+    total_challenges_solved: int
+    total_reviews_submitted: int
+    total_interview_sessions: int
+    exam_readiness_score: float
     exam_readiness: dict[str, int]
-    challenge_pass_rate: float
     weekly_digest: str
+    daily_activity: list[DailyActivity]
+    trend_data: list[TrendPoint]
+    weekly_challenge_goal: int
+    weekly_challenges_done: int
+    roadmap_tracker: Optional[RoadmapTracker] = None
 
 
 class SnapshotItem(BaseModel):
@@ -52,7 +104,7 @@ class SnapshotItem(BaseModel):
 
 class StreakResponse(BaseModel):
     streak_days: int
-    last_activity: Optional[date]
+    last_activity: Optional[date] = None
 
 
 # ══════════════════════════════════════════════════════════════════════════ #
@@ -78,7 +130,10 @@ async def get_dashboard(
 
     cached_dashboard = await cache.get_progress_dashboard(user_id)
     if cached_dashboard:
-        return DashboardResponse(**cached_dashboard)
+        try:
+            return DashboardResponse(**cached_dashboard)
+        except Exception:
+            await cache.delete_progress_dashboard(user_id)
 
     # Resolve current skill profile from cache
     skill_profile: dict = {}
@@ -111,17 +166,22 @@ async def get_dashboard(
     }
 
     final_state = await progress_agent_node(state)
-
     structured = final_state.get("structured_output", {})
-    response = DashboardResponse(
-        skill_delta_7d=structured.get("skill_delta_7d", {}),
-        skill_delta_30d=structured.get("skill_delta_30d", {}),
-        streak=structured.get("streak", 0),
-        exam_readiness=structured.get("exam_readiness", {}),
-        challenge_pass_rate=structured.get("challenge_pass_rate", 0.0),
-        weekly_digest=structured.get("weekly_digest", "No digest available yet."),
-    )
-    await cache.set_progress_dashboard(user_id, response.model_dump())
+
+    if "user" not in structured or not structured["user"]:
+        structured["user"] = {
+            "id": str(current_user.id),
+            "github_id": current_user.github_id,
+            "username": current_user.github_username or "",
+            "email": None,
+            "avatar_url": current_user.avatar_url,
+            "name": current_user.display_name,
+            "created_at": current_user.created_at.isoformat() if current_user.created_at else "",
+            "updated_at": current_user.created_at.isoformat() if current_user.created_at else "",
+        }
+
+    response = DashboardResponse(**structured)
+    await cache.set_progress_dashboard(user_id, response.model_dump(mode="json"))
     return response
 
 
@@ -184,42 +244,26 @@ async def get_streak(
     db=Depends(get_db),
 ):
     """
-    Computes the current consecutive-day streak (days with ≥ 1 challenge done)
-    and returns the date of the most recent recorded activity.
+    Computes the current consecutive-day streak dynamically across challenge attempts,
+    code reviews, and technical interview sessions.
     """
-    # Load last 90 days of snapshots (enough for any reasonable streak)
-    cutoff = (datetime.utcnow() - timedelta(days=90)).date()
-    result = await db.execute(
-        select(ProgressSnapshot)
-        .where(
-            ProgressSnapshot.user_id == current_user.id,
-            ProgressSnapshot.snapshot_date >= cutoff,
-            ProgressSnapshot.challenges_done > 0,
-        )
-        .order_by(ProgressSnapshot.snapshot_date.desc())
-    )
-    active_snapshots = result.scalars().all()
+    user_id = current_user.id
 
-    if not active_snapshots:
-        return StreakResponse(streak_days=0, last_activity=None)
+    att_res = await db.execute(select(ChallengeAttempt.attempted_at).where(ChallengeAttempt.user_id == user_id))
+    rev_res = await db.execute(select(CodeReview.created_at).where(CodeReview.user_id == user_id))
+    iv_res = await db.execute(select(InterviewSession.created_at).where(InterviewSession.user_id == user_id))
 
-    # Compute streak from the most recent activity day backwards
-    today = datetime.utcnow().date()
-    streak = 0
-    check_date = active_snapshots[0].snapshot_date  # most recent active day
+    active_dates = set()
+    for row in att_res.scalars().all():
+        active_dates.add(row.date())
+    for row in rev_res.scalars().all():
+        active_dates.add(row.date())
+    for row in iv_res.scalars().all():
+        active_dates.add(row.date())
 
-    # Allow streak to start from today or yesterday
-    if check_date < today - timedelta(days=1):
-        # Streak is broken — most recent activity was 2+ days ago
-        return StreakResponse(streak_days=0, last_activity=check_date)
-
-    active_dates = {s.snapshot_date for s in active_snapshots}
-    current = check_date
-    while current in active_dates:
-        streak += 1
-        current -= timedelta(days=1)
+    current_streak, longest_streak, last_act = _calculate_consecutive_streaks(active_dates)
 
     return StreakResponse(
-        streak_days=streak,
-        last_activity=active_snapshots[0].snapshot_date,
+        streak_days=current_streak,
+        last_activity=last_act,
     )

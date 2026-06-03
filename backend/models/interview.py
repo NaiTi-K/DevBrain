@@ -126,7 +126,4 @@ class InterviewSession(Base):
         self.structured_output = so
 
     def __repr__(self) -> str:
-        return (
-            f"<InterviewSession id={self.id} mode={self.mode} "
-            f"turns={len(self.messages) if self.messages else 0}>"
-        )
+        return f"<InterviewSession id={self.id} mode={self.mode} turns={len(self.messages) if self.messages else 0}>"

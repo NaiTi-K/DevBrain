@@ -136,10 +136,7 @@ def _extract_skill_profile(user: User) -> dict:
     try:
         if user and hasattr(user, "skill_profile") and user.skill_profile:
             raw = getattr(user.skill_profile, "skills", {}) or {}
-            return {
-                k: float(v.get("score", v) if isinstance(v, dict) else v)
-                for k, v in raw.items()
-            }
+            return {k: float(v.get("score", v) if isinstance(v, dict) else v) for k, v in raw.items()}
     except Exception:
         pass
     return {}
@@ -210,7 +207,5 @@ async def list_topics(
         )
 
     # Normalise: replace underscores with spaces for readability
-    display_topics = sorted(
-        {t.replace("_", " ").title() for t in topics if t}
-    )
+    display_topics = sorted({t.replace("_", " ").title() for t in topics if t})
     return TopicsResponse(topics=display_topics)

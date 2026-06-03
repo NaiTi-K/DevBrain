@@ -163,7 +163,4 @@ class ChallengeAttempt(Base):
         self.attempted_at = value
 
     def __repr__(self) -> str:
-        return (
-            f"<ChallengeAttempt id={self.id} passed={self.passed} "
-            f"tests={self.tests_passed}/{self.tests_total}>"
-        )
+        return f"<ChallengeAttempt id={self.id} passed={self.passed} tests={self.tests_passed}/{self.tests_total}>"

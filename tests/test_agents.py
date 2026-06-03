@@ -8,6 +8,7 @@ roadmap generation, challenge selection, code evaluation, and resource search.
 
 import asyncio
 import uuid
+import textwrap
 from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -33,6 +34,7 @@ from agents.resource_agent import resource_agent_node
 # Helpers
 # ===========================================================================
 
+
 def _make_state(**kwargs) -> DevBrainState:
     """Build a minimal DevBrainState with sensible defaults."""
     defaults: dict[str, Any] = {
@@ -55,6 +57,7 @@ def _make_state(**kwargs) -> DevBrainState:
 # ===========================================================================
 # 1-4  Intent routing
 # ===========================================================================
+
 
 class TestRouteIntent:
     """route_intent should classify user messages into well-known intents."""
@@ -95,7 +98,6 @@ SAMPLE_REVIEW = {
 
 
 class TestCodeReviewAgent:
-
     @pytest.mark.asyncio
     @patch("agents.code_review_agent.llm")
     async def test_code_review_node_returns_structured(self, mock_llm):
@@ -121,9 +123,7 @@ class TestCodeReviewAgent:
             structured_output={
                 "language": "python",
                 "code": "def add(a, b): return a + b",
-                "improvements": [
-                    {"code_after": "def add(a, b): return a + b # speed"}
-                ]
+                "improvements": [{"code_after": "def add(a, b): return a + b # speed"}],
             }
         )
         result = await reflection_node(state)
@@ -141,8 +141,8 @@ class TestCodeReviewAgent:
 # 10-11  GitHub analyzer with cache logic
 # ===========================================================================
 
-class TestGithubAnalyzerNode:
 
+class TestGithubAnalyzerNode:
     @pytest.mark.asyncio
     @patch("agents.github_analyzer.github_service")
     @patch("agents.github_analyzer.cache")
@@ -202,7 +202,6 @@ SIX_WEEK_PLAN = {
 
 
 class TestRoadmapAgent:
-
     @pytest.mark.asyncio
     @patch("agents.roadmap_agent.polish_roadmap_copy", new_callable=AsyncMock)
     @patch("agents.roadmap_agent.async_session")
@@ -213,14 +212,22 @@ class TestRoadmapAgent:
             "skills": {"Python": 0.7, "SQL": 0.4},
             "frameworks": {"FastAPI": 0.8},
             "engineering_practices": {
-                "has_cicd": False, "test_signal": 0.0,
-                "commit_quality": 0.2, "avg_complexity": 5.0,
+                "has_cicd": False,
+                "test_signal": 0.0,
+                "commit_quality": 0.2,
+                "avg_complexity": 5.0,
             },
-            "repo_highlights": [{
-                "name": "my-api", "primary_language": "Python",
-                "stars": 1, "has_cicd": False, "has_tests": False,
-                "frameworks": ["FastAPI"], "sample_commits": [],
-            }],
+            "repo_highlights": [
+                {
+                    "name": "my-api",
+                    "primary_language": "Python",
+                    "stars": 1,
+                    "has_cicd": False,
+                    "has_tests": False,
+                    "frameworks": ["FastAPI"],
+                    "sample_commits": [],
+                }
+            ],
             "sample_commits": [],
             "repo_count": 1,
         }
@@ -248,15 +255,27 @@ class TestRoadmapAgent:
 # 13  Challenge agent — targets weakest skill
 # ===========================================================================
 
-class TestChallengeAgent:
 
+class TestChallengeAgent:
     @pytest.mark.asyncio
+    @patch(
+        "services.search_service.search_service.search",
+        new_callable=AsyncMock,
+        return_value=[],
+    )
+    @patch("services.sandbox_service.run_code")
     @patch("agents.challenge_agent.llm")
-    async def test_challenge_agent_picks_lowest_skill(self, mock_llm):
+    async def test_challenge_agent_picks_lowest_skill(
+        self, mock_llm, mock_run_code, mock_search
+    ):
         """
         With Python=0.1 and JS=0.9, the challenge should address Python
         (the lowest-scoring skill).
         """
+        mock_run_code.return_value = {
+            "status": "AC",
+            "test_results": [{"status": "AC", "stdout": "[1,4,9]", "case": 1}],
+        }
         mock_llm.structured_call = AsyncMock(
             return_value={
                 "title": "Python Square Challenge",
@@ -264,7 +283,13 @@ class TestChallengeAgent:
                 "difficulty": "easy",
                 "problem_statement": "Write a list comprehension to square numbers.",
                 "starter_code": "numbers = [1, 2, 3, 4, 5]\n# your code here",
-                "test_cases": [{"input": "[1,2,3]", "expected": "[1,4,9]"}],
+                "solution": "def solution(x):\n    return [i*i for i in x]",
+                "schema": {
+                    "params": [{"name": "x", "type": "int[]"}],
+                    "returns": "int[]",
+                    "judge": "exact",
+                },
+                "test_cases": [{"input": {"x": [1, 2, 3]}, "expected": "[1,4,9]"}],
             }
         )
         state = _make_state(
@@ -278,8 +303,6 @@ class TestChallengeAgent:
 # ===========================================================================
 # 14-15  Code evaluation — timeout and passing submission
 # ===========================================================================
-
-import textwrap
 
 async def evaluate_submission(
     challenge_or_code=None,
@@ -399,8 +422,8 @@ async def evaluate_submission(
         "error": first_error,
     }
 
-class TestEvaluateSubmission:
 
+class TestEvaluateSubmission:
     @pytest.mark.asyncio
     async def test_evaluate_submission_timeout(self):
         """Code that sleeps beyond the timeout should return an error dict."""
@@ -441,24 +464,23 @@ HIGH_CONFIDENCE_RESULTS = [
 
 
 class TestResourceAgent:
-
     @pytest.mark.asyncio
     @patch("agents.resource_agent.vector_store")
     @patch("agents.resource_agent.search_service")
-    async def test_resource_agent_uses_chromadb_first(
-        self, mock_search, mock_vs
-    ):
+    async def test_resource_agent_uses_chromadb_first(self, mock_search, mock_vs):
         """High-confidence ChromaDB results should prevent a Tavily call."""
-        mock_vs.search_resources = AsyncMock(return_value=[
-            {
-                "title": f"Trees {i}",
-                "url": f"https://example.com/trees{i}",
-                "snippet": f"Trees snippet {i}",
-                "distance": 0.1,  # less than 0.3 means high confidence
-                "source": "chromadb",
-            }
-            for i in range(3)
-        ])
+        mock_vs.search_resources = AsyncMock(
+            return_value=[
+                {
+                    "title": f"Trees {i}",
+                    "url": f"https://example.com/trees{i}",
+                    "snippet": f"Trees snippet {i}",
+                    "distance": 0.1,  # less than 0.3 means high confidence
+                    "source": "chromadb",
+                }
+                for i in range(3)
+            ]
+        )
         mock_search.search_resources = AsyncMock(return_value=[])
 
         state = _make_state(user_input="learn about binary trees")
@@ -470,9 +492,7 @@ class TestResourceAgent:
     @pytest.mark.asyncio
     @patch("agents.resource_agent.vector_store")
     @patch("agents.resource_agent.search_service")
-    async def test_resource_agent_falls_back_to_tavily(
-        self, mock_search, mock_vs
-    ):
+    async def test_resource_agent_falls_back_to_tavily(self, mock_search, mock_vs):
         """Empty ChromaDB results should trigger a Tavily web search."""
         mock_vs.search_resources = AsyncMock(return_value=[])
         mock_vs.add_resource = AsyncMock()

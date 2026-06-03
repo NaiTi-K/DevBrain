@@ -17,9 +17,7 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SYSTEM = (
-    "You are DevBrain, an expert developer mentor and senior software engineer."
-)
+_DEFAULT_SYSTEM = "You are DevBrain, an expert developer mentor and senior software engineer."
 
 _MIN_CALL_INTERVAL = 1.0
 _DEFAULT_MAX_RETRIES = 3
@@ -168,16 +166,12 @@ class LLMService:
             except httpx.RequestError as exc:
                 last_exc = exc
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(min(2 ** attempt, 5.0))
+                    await asyncio.sleep(min(2**attempt, 5.0))
                     continue
                 break
 
         # Try cheaper/faster model (separate Groq rate-limit bucket)
-        if (
-            try_fallback
-            and target_model != self.fallback_model
-            and isinstance(last_exc, GroqRateLimitError)
-        ):
+        if try_fallback and target_model != self.fallback_model and isinstance(last_exc, GroqRateLimitError):
             logger.info(
                 "Primary model rate-limited — trying fallback model %s",
                 self.fallback_model,
@@ -207,14 +201,10 @@ class LLMService:
         **call_kwargs,
     ) -> dict:
         json_prompt = (
-            prompt
-            + "\nIMPORTANT: Respond with ONLY valid JSON. "
-            "No markdown, no explanation, just the JSON object."
+            prompt + "\nIMPORTANT: Respond with ONLY valid JSON. No markdown, no explanation, just the JSON object."
         )
 
-        raw = await self.call(
-            json_prompt, system=system, max_tokens=max_tokens, **call_kwargs
-        )
+        raw = await self.call(json_prompt, system=system, max_tokens=max_tokens, **call_kwargs)
         parsed, error = self._try_parse(raw)
         if parsed is not None:
             return parsed
@@ -226,16 +216,12 @@ class LLMService:
             f"Raw response:\n{raw}\n\n"
             "Please return ONLY the corrected, valid JSON object — no explanation, no markdown."
         )
-        raw2 = await self.call(
-            corrective, system=system, max_tokens=max_tokens, **call_kwargs
-        )
+        raw2 = await self.call(corrective, system=system, max_tokens=max_tokens, **call_kwargs)
         parsed2, _error2 = self._try_parse(raw2)
         if parsed2 is not None:
             return parsed2
 
-        raise ValueError(
-            f"LLM returned invalid JSON after two attempts.\nRaw response:\n{raw2}"
-        )
+        raise ValueError(f"LLM returned invalid JSON after two attempts.\nRaw response:\n{raw2}")
 
     @staticmethod
     def _try_parse(text: str) -> tuple[dict | None, str]:

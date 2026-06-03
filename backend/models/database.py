@@ -23,16 +23,15 @@ engine_kwargs = {
 if "sqlite" in settings.DATABASE_URL:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
 else:
-    engine_kwargs.update({
-        "pool_size": 5,
-        "max_overflow": 10,
-        "pool_recycle": 1800,
-    })
+    engine_kwargs.update(
+        {
+            "pool_size": 5,
+            "max_overflow": 10,
+            "pool_recycle": 1800,
+        }
+    )
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    **engine_kwargs
-)
+engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)
 
 # ---------------------------------------------------------------------------
 # Session factory

@@ -76,6 +76,91 @@ function SkillLevelBadge({ level }: { level: string }) {
   );
 }
 
+function MarkdownRenderer({ content }: { content: string }) {
+  const normalized = (content ?? "").replace(/\\n/g, "\n");
+  const parts = normalized.split(/(```[\s\S]*?```)/g);
+
+  const renderLineContent = (text: string) => {
+    const boldParts = text.split(/(\*\*.*?\*\*)/g);
+    return boldParts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return (
+          <strong key={i} className="font-bold text-white bg-white/5 px-1 py-0.5 rounded border border-white/10 font-sans text-xs mx-0.5 shadow-[0_0_8px_rgba(255,255,255,0.05)]">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
+
+  return (
+    <div className="space-y-4 text-gray-300 text-sm leading-relaxed">
+      {parts.map((part, i) => {
+        if (part.startsWith("```")) {
+          const lines = part.split("\n");
+          const firstLine = lines[0] || "```";
+          const lang = firstLine.replace("```", "").trim();
+          const codeContent = lines.slice(1, -1).join("\n");
+          
+          return (
+            <div key={i} className="my-3">
+              {lang && (
+                <div className="text-xs text-gray-500 font-mono mb-1 uppercase tracking-wider">
+                  {lang}
+                </div>
+              )}
+              <pre className="bg-[#0f1117] border border-[#2d3148] rounded-xl p-4 overflow-x-auto font-mono text-xs text-gray-300">
+                <code>{codeContent}</code>
+              </pre>
+            </div>
+          );
+        } else {
+          const lines = part.split("\n");
+          return (
+            <div key={i} className="space-y-2.5">
+              {lines.map((line, j) => {
+                const trimmed = line.trim();
+                if (!trimmed) return <div key={j} className="h-2" />;
+                
+                if (trimmed.startsWith("### ")) {
+                  return (
+                    <h3 key={j} className="text-base font-bold text-white mt-6 mb-3 border-l-4 border-[#6366f1] pl-3">
+                      {trimmed.replace("### ", "")}
+                    </h3>
+                  );
+                }
+                if (trimmed.startsWith("#### ")) {
+                  return (
+                    <h4 key={j} className="text-sm font-semibold text-[#818cf8] mt-4 mb-2 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1]" />
+                      {trimmed.replace("#### ", "")}
+                    </h4>
+                  );
+                }
+                if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+                  const contentText = trimmed.substring(2);
+                  let isCritical = contentText.includes("[CRITICAL]") || contentText.includes("CRITICAL");
+                  let isHigh = contentText.includes("[HIGH]") || contentText.includes("HIGH");
+                  
+                  return (
+                    <div key={j} className={`flex gap-2 text-sm ml-4 py-1.5 px-3 rounded-lg ${isCritical ? 'bg-red-500/5 border border-red-500/10 text-red-200' : isHigh ? 'bg-amber-500/5 border border-amber-500/10 text-amber-200' : 'text-gray-300'}`}>
+                      <span className={isCritical ? 'text-red-400 font-bold shrink-0' : isHigh ? 'text-amber-400 font-bold shrink-0' : 'text-[#6366f1] shrink-0'}>•</span>
+                      <span className="flex-1">{renderLineContent(contentText)}</span>
+                    </div>
+                  );
+                }
+                
+                return <p key={j} className="text-sm text-gray-300 leading-relaxed">{renderLineContent(trimmed)}</p>;
+              })}
+            </div>
+          );
+        }
+      })}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<SkillProfile | null>(null);
@@ -148,7 +233,7 @@ export default function DashboardPage() {
   const topLang =
     profile?.top_languages?.[0] ?? "—";
   const repoCount = profile?.total_repos ?? 0;
-  const streak = dashboard?.streak ?? 0;
+  const streak = dashboard?.streak?.current_streak ?? 0;
 
   const avgSkill =
     Object.keys(skills).length > 0
@@ -419,8 +504,8 @@ export default function DashboardPage() {
               <span className="w-2 h-2 rounded-full bg-[#6366f1] inline-block" />
               GitHub Analysis
             </h2>
-            <div className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">
-              {profile.summary}
+            <div className="text-gray-300 text-sm leading-relaxed">
+              <MarkdownRenderer content={profile.summary} />
             </div>
           </div>
         )}

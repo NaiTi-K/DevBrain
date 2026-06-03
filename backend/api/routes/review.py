@@ -36,7 +36,7 @@ router = APIRouter(tags=["review"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 RATE_LIMIT_KEY_PREFIX = "review_ratelimit"
-RATE_LIMIT_MAX = 20       # requests
+RATE_LIMIT_MAX = 20  # requests
 RATE_LIMIT_WINDOW = 3600  # seconds (1 hour)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,6 +96,7 @@ class ReviewHistoryItem(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def _check_rate_limit(user_id: str) -> None:
     """
@@ -247,13 +248,12 @@ async def submit_review(
 
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def _token_stream(code: str, language: str, context: str) -> AsyncGenerator[str, None]:
     """Async generator that yields SSE-formatted chunks from llm.stream()."""
     from agents.code_review_agent import REVIEW_PROMPT, REVIEW_SYSTEM
 
-    context_block = (
-        f"Additional context: {context}\n\n" if context else ""
-    )
+    context_block = f"Additional context: {context}\n\n" if context else ""
     prompt = REVIEW_PROMPT.format(
         language=language,
         code=code,
@@ -304,6 +304,7 @@ async def stream_review(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get(
     "/history",

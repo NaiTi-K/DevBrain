@@ -14,8 +14,6 @@
   --text-primary: #ffffff;
   --text-secondary: #9ca3af;
   --card-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
-  --font-sans: var(--font-sans, 'Space Grotesk', sans-serif);
-  --font-mono: var(--font-mono, 'JetBrains Mono', monospace);
 }
 
 * {
@@ -29,7 +27,7 @@ html {
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-sans), 'Space Grotesk', sans-serif;
 }
 
 /* ── Scrollbar ── */
@@ -121,5 +119,5 @@ body {
 
 /* ── Code blocks in chat/review ── */
 pre, code {
-  font-family: var(--font-mono);
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
 }

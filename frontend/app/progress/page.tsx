@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
   LineChart,
@@ -23,6 +24,122 @@ const ProgressHeatmap = dynamic(
   () => import("@/components/ProgressHeatmap"),
   { ssr: false }
 );
+
+function MarkdownRenderer({ content }: { content: string }) {
+  const renderLineContent = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return (
+          <strong key={i} className="font-bold text-white bg-[#6366f1]/10 px-1.5 py-0.5 rounded border border-[#6366f1]/30 font-sans text-xs mx-0.5 shadow-[0_0_8px_rgba(99,102,241,0.2)]">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
+
+  // Safe check and parsing
+  const normalized = (content ?? "").replace(/\\n/g, "\n");
+  const sections: { title: string; items: string[] }[] = [];
+  let currentSection: { title: string; items: string[] } | null = null;
+
+  const lines = normalized.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (trimmed.startsWith("#### ") || trimmed.startsWith("### ")) {
+      if (currentSection) {
+        sections.push(currentSection);
+      }
+      currentSection = {
+        title: trimmed.replace(/^#+\s+/, ""),
+        items: [],
+      };
+    } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      if (currentSection) {
+        currentSection.items.push(trimmed.substring(2).trim());
+      } else {
+        currentSection = {
+          title: "Overview",
+          items: [trimmed.substring(2).trim()],
+        };
+      }
+    } else {
+      if (currentSection) {
+        currentSection.items.push(trimmed);
+      } else {
+        currentSection = {
+          title: "Overview",
+          items: [trimmed],
+        };
+      }
+    }
+  }
+  if (currentSection) {
+    sections.push(currentSection);
+  }
+
+  const getSectionConfig = (title: string) => {
+    const t = title.toLowerCase();
+    if (t.includes("win") || t.includes("progress")) {
+      return {
+        icon: "🏆",
+        bg: "from-emerald-500/5 to-transparent",
+        border: "border-t-emerald-500/40 hover:border-emerald-500/60",
+        bullet: "text-emerald-400",
+        titleColor: "text-emerald-400",
+      };
+    }
+    if (t.includes("improve") || t.includes("attention")) {
+      return {
+        icon: "⚠️",
+        bg: "from-amber-500/5 to-transparent",
+        border: "border-t-amber-500/40 hover:border-amber-500/60",
+        bullet: "text-amber-400",
+        titleColor: "text-amber-400",
+      };
+    }
+    return {
+      icon: "🚀",
+      bg: "from-indigo-500/5 to-transparent",
+      border: "border-t-indigo-500/40 hover:border-indigo-500/60",
+      bullet: "text-indigo-400",
+      titleColor: "text-indigo-400",
+    };
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 w-full">
+      {sections.map((section, idx) => {
+        const config = getSectionConfig(section.title);
+        return (
+          <div
+            key={idx}
+            className={`bg-[#1a1d2e]/60 border border-[#2d3148] border-t-2 ${config.border} bg-gradient-to-b ${config.bg} rounded-xl p-5 shadow-[0_0_20px_rgba(99,102,241,0.03)] hover:shadow-[0_0_25px_rgba(99,102,241,0.06)] hover:bg-[#1a1d2e]/80 transition-all duration-300 flex flex-col justify-between`}
+          >
+            <div>
+              <h4 className={`text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 mb-4 ${config.titleColor}`}>
+                <span className="text-base">{config.icon}</span>
+                {section.title}
+              </h4>
+              <ul className="space-y-3">
+                {section.items.map((item, itemIdx) => (
+                  <li key={itemIdx} className="flex gap-2 text-sm text-gray-300 leading-relaxed items-start">
+                    <span className={`text-base font-bold shrink-0 leading-none select-none ${config.bullet}`}>•</span>
+                    <span className="flex-1">{renderLineContent(item)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function CircularProgress({
   pct,
@@ -162,10 +279,10 @@ export default function ProgressPage() {
     acc[curr.skill] = curr.delta_7d;
     return acc;
   }, {} as Record<string, number>) ?? {};
-  const examReadiness = dashboard.exam_readiness_score ? { "Overall Readiness": Math.round(dashboard.exam_readiness_score * 100) } : {};
-  const weeklyDigest = dashboard.focus_recommendations?.join(" ") ?? "";
+  const examReadiness = dashboard.exam_readiness ?? {};
+  const weeklyDigest = dashboard.weekly_digest ?? "";
   const activityData = dashboard.daily_activity ?? [];
-  const trendData: any[] = [];
+  const trendData: any[] = dashboard.trend_data ?? [];
 
   const formattedTrend = trendData.map(
     (pt: { date: string; score: number }) => ({
@@ -227,6 +344,42 @@ export default function ProgressPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Roadmap Tracker Card ── */}
+      {dashboard.roadmap_tracker && (
+        <div className="bg-[#1a1d2e] border border-[#6366f133] rounded-xl p-6 shadow-[0_0_15px_rgba(99,102,241,0.15)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-[#6366f122] rounded-2xl flex items-center justify-center text-3xl flex-shrink-0">
+              🗺️
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs uppercase tracking-widest font-medium">Active Learning Roadmap</p>
+              <h3 className="text-white font-extrabold text-lg mt-0.5">{dashboard.roadmap_tracker.target_role}</h3>
+              <p className="text-gray-400 text-xs mt-1">
+                Progress: <span className="text-white font-semibold">{dashboard.roadmap_tracker.completed_topics}</span> of <span className="text-white font-semibold">{dashboard.roadmap_tracker.total_topics}</span> sub-tasks completed
+              </p>
+            </div>
+          </div>
+          <div className="flex-1 max-w-xs w-full space-y-1.5">
+            <div className="flex justify-between text-xs font-semibold text-gray-400">
+              <span>Roadmap Progress</span>
+              <span className="text-[#6366f1]">{Math.round(dashboard.roadmap_tracker.percent_completed * 100)}%</span>
+            </div>
+            <div className="h-2.5 bg-[#0f1117] rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-[#6366f1] to-[#818cf8] rounded-full transition-all duration-700" 
+                style={{ width: `${dashboard.roadmap_tracker.percent_completed * 100}%` }}
+              />
+            </div>
+          </div>
+          <Link 
+            href="/roadmap" 
+            className="px-4 py-2 bg-[#6366f1] hover:bg-[#5558e3] text-white text-sm font-semibold rounded-lg transition-colors shrink-0 text-center w-full sm:w-auto"
+          >
+            Go to Tracker →
+          </Link>
+        </div>
+      )}
 
       {/* ── Skill delta section ── */}
       {Object.keys(skills).length > 0 && (
@@ -333,14 +486,12 @@ export default function ProgressPage() {
 
       {/* ── Weekly digest ── */}
       {weeklyDigest && (
-        <div className="bg-[#1a1d2e] border border-[#6366f133] rounded-xl p-6 shadow-[0_0_15px_rgba(99,102,241,0.15)]">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="space-y-4">
+          <h2 className="text-white font-semibold flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#6366f1]" />
-            <span className="text-[#6366f1] text-xs font-semibold uppercase tracking-widest">
-              Weekly Digest
-            </span>
-          </div>
-          <p className="text-gray-300 text-sm leading-relaxed">{weeklyDigest}</p>
+            AI Weekly Progress Digest
+          </h2>
+          <MarkdownRenderer content={weeklyDigest} />
         </div>
       )}
 

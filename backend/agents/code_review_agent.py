@@ -40,6 +40,7 @@ REVIEW_PROMPT = (
     "}}"
 )
 
+
 def _extract_language_and_code(state: DevBrainState) -> tuple[str, str]:
     structured: dict = state.get("structured_output") or {}
     language = structured.get("language") or "python"
@@ -55,6 +56,7 @@ def _extract_language_and_code(state: DevBrainState) -> tuple[str, str]:
             except (json.JSONDecodeError, TypeError):
                 code = user_input
     return language, code
+
 
 async def code_review_node(state: DevBrainState) -> DevBrainState:
     """Runs AST + Linter, then calls LLM."""
@@ -72,7 +74,7 @@ async def code_review_node(state: DevBrainState) -> DevBrainState:
         language=language,
         code=code,
         ast_report=json.dumps(ast_facts, indent=2),
-        linter_report=json.dumps(lint_facts, indent=2)
+        linter_report=json.dumps(lint_facts, indent=2),
     )
 
     try:
@@ -80,8 +82,12 @@ async def code_review_node(state: DevBrainState) -> DevBrainState:
     except Exception as exc:
         logger.error("LLM call failed in code_review_node: %s", exc)
         review_dict = {
-            "score": 0, "annotations": [], "complexity": {"time": "unknown", "space": "unknown"},
-            "edge_cases": [], "improvements": [], "summary": f"Error: {exc}"
+            "score": 0,
+            "annotations": [],
+            "complexity": {"time": "unknown", "space": "unknown"},
+            "edge_cases": [],
+            "improvements": [],
+            "summary": f"Error: {exc}",
         }
 
     review_dict.setdefault("improvements", [])
@@ -94,6 +100,7 @@ async def code_review_node(state: DevBrainState) -> DevBrainState:
     state["agent_output"] = json.dumps(review_dict)
 
     return state
+
 
 async def reflection_node(state: DevBrainState) -> DevBrainState:
     """Now acts as the Sandbox Execution node."""
@@ -123,18 +130,19 @@ async def reflection_node(state: DevBrainState) -> DevBrainState:
                 "verified": True,
                 "badge": "✅ VERIFIED",
                 "message": f"Compiled successfully. {speedup:.1f}x speedup vs original.",
-                "speedup": speedup
+                "speedup": speedup,
             }
         else:
             imp["verification"] = {
                 "verified": True,
                 "badge": "✅ COMPILES",
-                "message": "Syntax valid, but benchmarking failed or timed out."
+                "message": "Syntax valid, but benchmarking failed or timed out.",
             }
 
     state["structured_output"] = review_dict
     state["agent_output"] = json.dumps(review_dict)
     return state
+
 
 def should_reflect_again(state: DevBrainState) -> str:
     """We removed the loop, this just routes to done."""

@@ -15,14 +15,15 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
-    create_async_engine,
 )
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.dialects.postgresql import JSONB
 
+
 @compiles(JSONB, "sqlite")
 def compile_jsonb_sqlite(element, compiler, **kw):
     return "JSON"
+
 
 # ---------------------------------------------------------------------------
 # Patch settings BEFORE importing any app code so modules pick up test values
@@ -49,22 +50,17 @@ _settings_patch = patch.dict(
 _settings_patch.start()
 
 # Now safe to import app modules
-from core.config import settings  # noqa: E402
 from core.security import create_access_token  # noqa: E402
 from models.database import Base  # noqa: E402
 from models.user import User  # noqa: E402
 from models.skill_profile import SkillProfile  # noqa: E402
-from models.roadmap import Roadmap  # noqa: E402
-from models.challenge import Challenge, ChallengeAttempt  # noqa: E402
-from models.code_review import CodeReview  # noqa: E402
-from models.interview import InterviewSession  # noqa: E402
-from models.progress import ProgressSnapshot  # noqa: E402
 from main import app  # noqa: E402
 from core.dependencies import get_db  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Async test engine — one engine per session, schema created once
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -79,6 +75,7 @@ def event_loop():
 async def test_engine():
     """Create SQLite in-memory engine and all tables once per session."""
     from models.database import engine as db_engine
+
     engine = db_engine
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -101,6 +98,7 @@ def test_session_factory(test_engine):
 # Per-test DB session with automatic rollback for isolation
 # ---------------------------------------------------------------------------
 
+
 @pytest_asyncio.fixture
 async def db_session(test_session_factory) -> AsyncGenerator[AsyncSession, None]:
     """
@@ -122,6 +120,7 @@ async def db_session(test_session_factory) -> AsyncGenerator[AsyncSession, None]
 # ---------------------------------------------------------------------------
 # Domain fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 async def mock_user(db_session: AsyncSession) -> User:
@@ -174,6 +173,7 @@ def auth_headers(mock_user: User) -> dict[str, str]:
 # FastAPI async test client with DB override
 # ---------------------------------------------------------------------------
 
+
 @pytest_asyncio.fixture
 async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """
@@ -198,6 +198,7 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
 # ---------------------------------------------------------------------------
 # Shared mock helpers
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_llm():
@@ -225,15 +226,19 @@ def mock_cache():
 def mock_github_service():
     """Return a MagicMock for services.github_service."""
     mock = MagicMock()
-    mock.get_user_repos = AsyncMock(return_value=[
-        {"name": "cool-api", "language": "Python", "stargazers_count": 12},
-        {"name": "web-app", "language": "JavaScript", "stargazers_count": 5},
-    ])
-    mock.analyze_skills = AsyncMock(return_value={
-        "Python": 0.75,
-        "JavaScript": 0.60,
-        "TypeScript": 0.50,
-    })
+    mock.get_user_repos = AsyncMock(
+        return_value=[
+            {"name": "cool-api", "language": "Python", "stargazers_count": 12},
+            {"name": "web-app", "language": "JavaScript", "stargazers_count": 5},
+        ]
+    )
+    mock.analyze_skills = AsyncMock(
+        return_value={
+            "Python": 0.75,
+            "JavaScript": 0.60,
+            "TypeScript": 0.50,
+        }
+    )
     return mock
 
 
@@ -241,14 +246,16 @@ def mock_github_service():
 def mock_vector_store():
     """Return a MagicMock for services.vector_store."""
     mock = MagicMock()
-    mock.search = AsyncMock(return_value=[
-        {
-            "title": "Python Data Structures",
-            "url": "https://docs.python.org/3/tutorial/datastructures.html",
-            "snippet": "Lists, dicts, sets — official Python docs.",
-            "score": 0.92,
-            "source": "chromadb",
-        }
-    ])
+    mock.search = AsyncMock(
+        return_value=[
+            {
+                "title": "Python Data Structures",
+                "url": "https://docs.python.org/3/tutorial/datastructures.html",
+                "snippet": "Lists, dicts, sets — official Python docs.",
+                "score": 0.92,
+                "source": "chromadb",
+            }
+        ]
+    )
     mock.add_documents = AsyncMock(return_value=True)
     return mock

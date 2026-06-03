@@ -156,10 +156,7 @@ async def oauth_callback(
     await db.flush()
 
     jwt_token = create_access_token({"sub": str(github_id)})
-    frontend_callback = (
-        f"{settings.FRONTEND_URL.rstrip('/')}/auth/callback"
-        f"?token={jwt_token}"
-    )
+    frontend_callback = f"{settings.FRONTEND_URL.rstrip('/')}/auth/callback?token={jwt_token}"
     return RedirectResponse(url=frontend_callback, status_code=status.HTTP_302_FOUND)
 
 

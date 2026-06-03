@@ -68,9 +68,9 @@ def _repo_importance_score(repo: dict) -> float:
 
     score = (
         stars * 50.0
-        + min(code_bytes / 400.0, 250.0)       # primary: actual code mass
-        + min(size_kb, 8_000) * 0.12           # GitHub size in KB
-        + min(commits, 80) * 0.8               # commits help but saturate early
+        + min(code_bytes / 400.0, 250.0)  # primary: actual code mass
+        + min(size_kb, 8_000) * 0.12  # GitHub size in KB
+        + min(commits, 80) * 0.8  # commits help but saturate early
         + recency * 0.6
         + (8.0 if has_description else 0.0)
         + (5.0 if has_language else 0.0)
@@ -87,9 +87,7 @@ def _repo_importance_score(repo: dict) -> float:
     return round(score, 2)
 
 
-def _select_deep_scan_repos(
-    repos: list[dict], limit: int = _DEEP_SCAN_COUNT
-) -> tuple[list[dict], list[dict]]:
+def _select_deep_scan_repos(repos: list[dict], limit: int = _DEEP_SCAN_COUNT) -> tuple[list[dict], list[dict]]:
     """Return top-N repos for deep scan plus transparent ranking metadata."""
     effective_limit = min(limit, len(repos))
     if effective_limit <= 0:
@@ -100,16 +98,18 @@ def _select_deep_scan_repos(
         score = _repo_importance_score(r)
         code_kb = round(sum(r.get("languages", {}).values()) / 1024, 1)
         pushed = r.get("pushed_at")
-        rankings.append({
-            "name": r["name"],
-            "score": score,
-            "stars": r.get("stars", 0),
-            "commits": r.get("commit_count", 0),
-            "size_kb": r.get("size", 0),
-            "code_kb": code_kb,
-            "pushed_at": pushed.isoformat() if isinstance(pushed, datetime) else None,
-            "language": r.get("language"),
-        })
+        rankings.append(
+            {
+                "name": r["name"],
+                "score": score,
+                "stars": r.get("stars", 0),
+                "commits": r.get("commit_count", 0),
+                "size_kb": r.get("size", 0),
+                "code_kb": code_kb,
+                "pushed_at": pushed.isoformat() if isinstance(pushed, datetime) else None,
+                "language": r.get("language"),
+            }
+        )
 
     rankings.sort(key=lambda x: x["score"], reverse=True)
     ranked_names = {x["name"] for x in rankings[:effective_limit]}
@@ -155,81 +155,81 @@ def _list_owned_repos(gh: Github, username: str, *, has_token: bool):
 # npm package name substring → display name
 # Score is set to 0.85 for runtime deps, 0.70 for devDependencies only.
 _NPM_MAP: dict[str, str] = {
-    "react":          "React",
-    "next":           "Next.js",
-    "vue":            "Vue.js",
-    "nuxt":           "Nuxt.js",
-    "angular/core":   "Angular",
-    "svelte":         "Svelte",
-    "express":        "Express",
-    "fastify":        "Fastify",
-    "nestjs/core":    "NestJS",
-    "tailwindcss":    "Tailwind CSS",
-    "typescript":     "TypeScript",
-    "graphql":        "GraphQL",
-    "prisma/client":  "Prisma",
-    "jest":           "Jest",
-    "vitest":         "Vitest",
-    "webpack":        "Webpack",
-    "vite":           "Vite",
-    "socket.io":      "Socket.IO",
-    "mongoose":       "Mongoose",
-    "sequelize":      "Sequelize",
-    "drizzle-orm":    "Drizzle ORM",
-    "redux":          "Redux",
-    "zustand":        "Zustand",
-    "trpc":           "tRPC",
+    "react": "React",
+    "next": "Next.js",
+    "vue": "Vue.js",
+    "nuxt": "Nuxt.js",
+    "angular/core": "Angular",
+    "svelte": "Svelte",
+    "express": "Express",
+    "fastify": "Fastify",
+    "nestjs/core": "NestJS",
+    "tailwindcss": "Tailwind CSS",
+    "typescript": "TypeScript",
+    "graphql": "GraphQL",
+    "prisma/client": "Prisma",
+    "jest": "Jest",
+    "vitest": "Vitest",
+    "webpack": "Webpack",
+    "vite": "Vite",
+    "socket.io": "Socket.IO",
+    "mongoose": "Mongoose",
+    "sequelize": "Sequelize",
+    "drizzle-orm": "Drizzle ORM",
+    "redux": "Redux",
+    "zustand": "Zustand",
+    "trpc": "tRPC",
 }
 
 # pip package name (exact, lowercased) → display name
 _PIP_MAP: dict[str, str] = {
-    "fastapi":              "FastAPI",
-    "django":               "Django",
-    "flask":                "Flask",
-    "starlette":            "Starlette",
-    "sqlalchemy":           "SQLAlchemy",
-    "pydantic":             "Pydantic",
-    "celery":               "Celery",
-    "pytest":               "Pytest",
-    "numpy":                "NumPy",
-    "pandas":               "Pandas",
-    "scikit-learn":         "scikit-learn",
-    "tensorflow":           "TensorFlow",
-    "torch":                "PyTorch",
-    "transformers":         "HuggingFace Transformers",
-    "langchain":            "LangChain",
-    "langgraph":            "LangGraph",
-    "redis":                "Redis",
-    "asyncpg":              "asyncpg",
-    "aiohttp":              "aiohttp",
-    "httpx":                "HTTPX",
-    "alembic":              "Alembic",
-    "chromadb":             "ChromaDB",
-    "openai":               "OpenAI SDK",
-    "anthropic":            "Anthropic SDK",
-    "groq":                 "Groq SDK",
+    "fastapi": "FastAPI",
+    "django": "Django",
+    "flask": "Flask",
+    "starlette": "Starlette",
+    "sqlalchemy": "SQLAlchemy",
+    "pydantic": "Pydantic",
+    "celery": "Celery",
+    "pytest": "Pytest",
+    "numpy": "NumPy",
+    "pandas": "Pandas",
+    "scikit-learn": "scikit-learn",
+    "tensorflow": "TensorFlow",
+    "torch": "PyTorch",
+    "transformers": "HuggingFace Transformers",
+    "langchain": "LangChain",
+    "langgraph": "LangGraph",
+    "redis": "Redis",
+    "asyncpg": "asyncpg",
+    "aiohttp": "aiohttp",
+    "httpx": "HTTPX",
+    "alembic": "Alembic",
+    "chromadb": "ChromaDB",
+    "openai": "OpenAI SDK",
+    "anthropic": "Anthropic SDK",
+    "groq": "Groq SDK",
 }
 
 # go.mod module-path substring → display name
 _GO_MAP: dict[str, str] = {
-    "gin-gonic/gin":   "Gin",
-    "labstack/echo":   "Echo",
-    "gofiber/fiber":   "Fiber",
-    "go-gorm/gorm":    "GORM",
-    "gorilla/mux":     "Gorilla Mux",
-    "grpc/grpc-go":    "gRPC",
+    "gin-gonic/gin": "Gin",
+    "labstack/echo": "Echo",
+    "gofiber/fiber": "Fiber",
+    "go-gorm/gorm": "GORM",
+    "gorilla/mux": "Gorilla Mux",
+    "grpc/grpc-go": "gRPC",
 }
 
 # Cargo.toml crate name → display name
 _CARGO_MAP: dict[str, str] = {
     "actix-web": "Actix-Web",
-    "axum":      "Axum",
-    "tokio":     "Tokio",
-    "serde":     "Serde",
-    "sqlx":      "SQLx",
-    "diesel":    "Diesel",
-    "reqwest":   "Reqwest",
-    "tonic":     "Tonic (gRPC)",
+    "axum": "Axum",
+    "tokio": "Tokio",
+    "serde": "Serde",
+    "sqlx": "SQLx",
+    "diesel": "Diesel",
+    "reqwest": "Reqwest",
+    "tonic": "Tonic (gRPC)",
 }
 
 
@@ -246,7 +246,7 @@ _CC_RE = re.compile(
 
 # CI/CD file paths / directory names to probe (order: cheapest checks first)
 _CICD_PROBES: tuple[str, ...] = (
-    ".github/workflows",       # GitHub Actions (directory → returns list, not 404)
+    ".github/workflows",  # GitHub Actions (directory → returns list, not 404)
     ".travis.yml",
     "Jenkinsfile",
     ".circleci/config.yml",
@@ -257,7 +257,11 @@ _CICD_PROBES: tuple[str, ...] = (
 
 # Common test-directory names to probe
 _TEST_DIR_PROBES: tuple[str, ...] = (
-    "tests", "test", "__tests__", "spec", "specs",
+    "tests",
+    "test",
+    "__tests__",
+    "spec",
+    "specs",
 )
 
 # Manifest files to fetch per repo (order matters — most informative first)
@@ -275,6 +279,7 @@ _MANIFEST_FILES: tuple[str, ...] = (
 # AST visitor — McCabe Cyclomatic Complexity for Python source files           #
 # Runs fully in-process on source text.  Never executes untrusted code.       #
 # ═══════════════════════════════════════════════════════════════════════════ #
+
 
 class _ComplexityVisitor(ast.NodeVisitor):
     """
@@ -348,6 +353,7 @@ class _ComplexityVisitor(ast.NodeVisitor):
 # ═══════════════════════════════════════════════════════════════════════════ #
 # Pure framework-extraction functions (no I/O, no LLM)                        #
 # ═══════════════════════════════════════════════════════════════════════════ #
+
 
 def _parse_package_json(content: str) -> dict[str, float]:
     """Deterministically extract framework scores from a package.json string."""
@@ -428,12 +434,12 @@ def _parse_cargo_toml(content: str) -> dict[str, float]:
 
 # Dispatch table — keyed by manifest filename
 _MANIFEST_PARSERS: dict[str, object] = {
-    "package.json":    _parse_package_json,
+    "package.json": _parse_package_json,
     "requirements.txt": _parse_requirements_txt,
-    "Pipfile":         _parse_requirements_txt,   # same line format
-    "pyproject.toml":  _parse_pyproject_toml,
-    "go.mod":          _parse_go_mod,
-    "Cargo.toml":      _parse_cargo_toml,
+    "Pipfile": _parse_requirements_txt,  # same line format
+    "pyproject.toml": _parse_pyproject_toml,
+    "go.mod": _parse_go_mod,
+    "Cargo.toml": _parse_cargo_toml,
 }
 
 
@@ -458,6 +464,7 @@ def _extract_all_frameworks(
 # ═══════════════════════════════════════════════════════════════════════════ #
 # Engineering-practice scorers (pure Python, deterministic, no I/O)           #
 # ═══════════════════════════════════════════════════════════════════════════ #
+
 
 def _score_commit_quality(messages: list[str]) -> float:
     """
@@ -530,11 +537,7 @@ def _compute_engineering_practices(
     All values are deterministic — no LLM involved.
     """
     has_cicd = any(cicd_signals) if cicd_signals else False
-    test_signal = (
-        round(sum(test_signals) / len(test_signals), 4)
-        if test_signals
-        else 0.0
-    )
+    test_signal = round(sum(test_signals) / len(test_signals), 4) if test_signals else 0.0
     commit_quality = _score_commit_quality(commit_messages)
     ast_m = _ast_metrics_for_sources(python_sources)
 
@@ -542,7 +545,7 @@ def _compute_engineering_practices(
         "has_cicd": has_cicd,
         "test_signal": test_signal,
         "commit_quality": commit_quality,
-        **ast_m,   # avg_complexity, class_count, function_count
+        **ast_m,  # avg_complexity, class_count, function_count
     }
 
 
@@ -585,6 +588,7 @@ def _compute_language_skills(repos: list[dict]) -> dict[str, float]:
 # GitHubService                                                                #
 # ═══════════════════════════════════════════════════════════════════════════ #
 
+
 class GitHubService:
     def __init__(self) -> None:
         # No default token; each call receives its own token.
@@ -604,6 +608,7 @@ class GitHubService:
         Return all non-forked repos for *username* authenticated with *token*.
         Signature and return shape unchanged from v1.
         """
+
         def _fetch():
             gh = Github(token, retry=0)
             user = gh.get_user(username)
@@ -619,27 +624,27 @@ class GitHubService:
                     topics = repo.get_topics()
                 except GithubException:
                     topics = []
-                repos.append({
-                    "name": repo.name,
-                    "language": repo.language,
-                    "languages": languages,
-                    "stars": repo.stargazers_count,
-                    "size": repo.size,
-                    "updated_at": (
-                        repo.updated_at.isoformat()
-                        if isinstance(repo.updated_at, datetime)
-                        else str(repo.updated_at)
-                    ),
-                    "description": repo.description or "",
-                    "topics": topics,
-                })
+                repos.append(
+                    {
+                        "name": repo.name,
+                        "language": repo.language,
+                        "languages": languages,
+                        "stars": repo.stargazers_count,
+                        "size": repo.size,
+                        "updated_at": (
+                            repo.updated_at.isoformat()
+                            if isinstance(repo.updated_at, datetime)
+                            else str(repo.updated_at)
+                        ),
+                        "description": repo.description or "",
+                        "topics": topics,
+                    }
+                )
             return repos
 
         return await self._run(_fetch)
 
-    async def analyze_skill_profile(
-        self, username: str, token: str | None
-    ) -> dict:
+    async def analyze_skill_profile(self, username: str, token: str | None) -> dict:
         """
         Build a fully enriched, deterministic skill profile from all non-forked repos.
 
@@ -696,19 +701,21 @@ class GitHubService:
 
                 pushed_at = repo.pushed_at if isinstance(repo.pushed_at, datetime) else None
 
-                repos.append({
-                    "repo_obj":    repo,
-                    "name":        repo.name,
-                    "language":    repo.language,
-                    "languages":   languages,
-                    "stars":       repo.stargazers_count,
-                    "size":        repo.size,
-                    "description": repo.description or "",
-                    "pushed_at":   pushed_at,
-                    "commit_count": commit_count,
-                    "commits_pl":  commits_pl,
-                    "private":     bool(getattr(repo, "private", False)),
-                })
+                repos.append(
+                    {
+                        "repo_obj": repo,
+                        "name": repo.name,
+                        "language": repo.language,
+                        "languages": languages,
+                        "stars": repo.stargazers_count,
+                        "size": repo.size,
+                        "description": repo.description or "",
+                        "pushed_at": pushed_at,
+                        "commit_count": commit_count,
+                        "commits_pl": commits_pl,
+                        "private": bool(getattr(repo, "private", False)),
+                    }
+                )
 
             repo_stats = {
                 "total_listed": total_listed,
@@ -741,9 +748,7 @@ class GitHubService:
                 }
 
             # ── Phase 2: rank and deep-analyse most important repos ────────
-            top_repos, repo_rankings = _select_deep_scan_repos(
-                repos, _deep_scan_limit(len(repos))
-            )
+            top_repos, repo_rankings = _select_deep_scan_repos(repos, _deep_scan_limit(len(repos)))
             logger.info(
                 "Deep scan selection for %s: %s (deep=%d of %d owned non-fork repos)",
                 username,
@@ -770,9 +775,9 @@ class GitHubService:
                         fc = repo.get_contents(mf)
                         if isinstance(fc, list):
                             fc = fc[0]
-                        repo_manifests[mf] = fc.decoded_content.decode(
-                            "utf-8", errors="ignore"
-                        )[:2000]   # cap at 2 KB — prevents token blowup
+                        repo_manifests[mf] = fc.decoded_content.decode("utf-8", errors="ignore")[
+                            :2000
+                        ]  # cap at 2 KB — prevents token blowup
                     except Exception:
                         pass
                 manifests_by_repo[r["name"]] = repo_manifests
@@ -816,16 +821,18 @@ class GitHubService:
                         pass
 
                 repo_fw = _extract_all_frameworks({r["name"]: repo_manifests})
-                repo_highlights.append({
-                    "name": r["name"],
-                    "description": (repo.description or "").strip()[:200],
-                    "stars": r["stars"],
-                    "primary_language": r["language"] or "Unknown",
-                    "has_cicd": has_cicd,
-                    "has_tests": has_tests,
-                    "frameworks": list(repo_fw.keys())[:8],
-                    "sample_commits": repo_commit_samples,
-                })
+                repo_highlights.append(
+                    {
+                        "name": r["name"],
+                        "description": (repo.description or "").strip()[:200],
+                        "stars": r["stars"],
+                        "primary_language": r["language"] or "Unknown",
+                        "has_cicd": has_cicd,
+                        "has_tests": has_tests,
+                        "frameworks": list(repo_fw.keys())[:8],
+                        "sample_commits": repo_commit_samples,
+                    }
+                )
 
                 # ── 2e. Python source fetch for AST ───────────────────────
                 # Only run when Python is ≥ 30% of this repo's bytes.
@@ -856,26 +863,24 @@ class GitHubService:
                             try:
                                 fc = repo.get_contents(py_path)
                                 if not isinstance(fc, list):
-                                    src = fc.decoded_content.decode(
-                                        "utf-8", errors="ignore"
-                                    )
+                                    src = fc.decoded_content.decode("utf-8", errors="ignore")
                                     python_sources.append(src)
                             except Exception:
                                 pass
                     except Exception:
-                        pass   # git tree walk is best-effort; never fatal
+                        pass  # git tree walk is best-effort; never fatal
 
             return {
-                "repos":            repos,
+                "repos": repos,
                 "manifests_by_repo": manifests_by_repo,
-                "cicd_signals":     cicd_signals,
-                "test_signals":     test_signals,
-                "commit_messages":  commit_messages,
-                "python_sources":   python_sources,
-                "repo_highlights":  repo_highlights,
-                "repo_rankings":    repo_rankings,
+                "cicd_signals": cicd_signals,
+                "test_signals": test_signals,
+                "commit_messages": commit_messages,
+                "python_sources": python_sources,
+                "repo_highlights": repo_highlights,
+                "repo_rankings": repo_rankings,
                 "deep_scanned_names": [r["name"] for r in top_repos],
-                "repo_stats":       repo_stats,
+                "repo_stats": repo_stats,
             }
 
         # ── Execute all I/O off the event loop ────────────────────────────
@@ -907,11 +912,11 @@ class GitHubService:
                 "primary_language": None,
                 "frameworks": {},
                 "engineering_practices": {
-                    "has_cicd":       False,
-                    "test_signal":    0.0,
+                    "has_cicd": False,
+                    "test_signal": 0.0,
                     "commit_quality": 0.0,
                     "avg_complexity": 0.0,
-                    "class_count":    0,
+                    "class_count": 0,
                     "function_count": 0,
                 },
                 "repo_highlights": [],
@@ -935,18 +940,18 @@ class GitHubService:
         sorted_langs = sorted(skills, key=lambda lang: skills[lang], reverse=True)
 
         return {
-            "skills":                skills,
-            "repo_count":            repo_count,
-            "top_languages":         sorted_langs[:10],
-            "primary_language":      sorted_langs[0] if sorted_langs else None,
-            "frameworks":            frameworks,
+            "skills": skills,
+            "repo_count": repo_count,
+            "top_languages": sorted_langs[:10],
+            "primary_language": sorted_langs[0] if sorted_langs else None,
+            "frameworks": frameworks,
             "engineering_practices": ep,
-            "repo_highlights":       repo_highlights,
-            "sample_commits":        sample_commits,
-            "repo_rankings":         repo_rankings,
-            "deep_scanned_names":    deep_scanned_names,
-            "repo_stats":            repo_stats,
-            "used_github_token":     bool(auth_token),
+            "repo_highlights": repo_highlights,
+            "sample_commits": sample_commits,
+            "repo_rankings": repo_rankings,
+            "deep_scanned_names": deep_scanned_names,
+            "repo_stats": repo_stats,
+            "used_github_token": bool(auth_token),
         }
 
     async def get_user_info(self, token: str) -> dict:
@@ -954,15 +959,16 @@ class GitHubService:
         Return basic profile info for the authenticated user.
         Signature and return shape unchanged from v1.
         """
+
         def _fetch():
             gh = Github(token, retry=0)
             user = gh.get_user()
             return {
-                "github_id":    user.id,
-                "login":        user.login,
-                "name":         user.name or "",
-                "avatar_url":   user.avatar_url,
-                "bio":          user.bio or "",
+                "github_id": user.id,
+                "login": user.login,
+                "name": user.name or "",
+                "avatar_url": user.avatar_url,
+                "bio": user.bio or "",
                 "public_repos": user.public_repos,
             }
 

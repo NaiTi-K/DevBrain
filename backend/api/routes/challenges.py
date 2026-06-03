@@ -111,10 +111,9 @@ async def generate_challenge(
 
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     result = await db.execute(
-        select(Challenge).where(
-            Challenge.user_id == current_user.id,
-            Challenge.created_at >= today_start
-        ).order_by(Challenge.created_at.desc())
+        select(Challenge)
+        .where(Challenge.user_id == current_user.id, Challenge.created_at >= today_start)
+        .order_by(Challenge.created_at.desc())
     )
     existing_challenge = result.scalars().first()
     if existing_challenge:
@@ -171,14 +170,13 @@ async def generate_challenge(
             detail="Challenge was generated but could not be retrieved.",
         )
 
-    result = await db.execute(
-        select(Challenge).where(Challenge.id == uuid.UUID(challenge_id))
-    )
+    result = await db.execute(select(Challenge).where(Challenge.id == uuid.UUID(challenge_id)))
     challenge: Optional[Challenge] = result.scalar_one_or_none()
 
     if not challenge:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="Challenge not found after creation.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Challenge not found after creation."
+        )
 
     return ChallengeResponse(
         id=str(challenge.id),
@@ -233,13 +231,14 @@ async def submit_challenge(
     result = await db.execute(select(Challenge).where(Challenge.id == cid))
     challenge: Optional[Challenge] = result.scalar_one_or_none()
     if not challenge:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Challenge not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Challenge not found.")
 
     # ── Run sandboxed evaluation ──────────────────────────────────────────
     # Note: If challenge.schema is missing on old challenges, fallback to default schema
     schema = challenge.schema or {"params": [], "returns": "int"}
-    eval_result = await asyncio.to_thread(run_code, body.language, body.code, schema, challenge.test_cases, challenge.judge)
+    eval_result = await asyncio.to_thread(
+        run_code, body.language, body.code, schema, challenge.test_cases, challenge.judge
+    )
 
     tests_total = len(eval_result["test_results"])
     tests_passed = sum(1 for tr in eval_result["test_results"] if tr["status"] == "AC")
@@ -260,7 +259,7 @@ async def submit_challenge(
         .where(
             ChallengeAttempt.challenge_id == cid,
             ChallengeAttempt.user_id == current_user.id,
-            ChallengeAttempt.attempted_at >= today_start
+            ChallengeAttempt.attempted_at >= today_start,
         )
         .order_by(ChallengeAttempt.attempted_at.desc())
     )
@@ -296,6 +295,7 @@ async def submit_challenge(
 
     await db.commit()
     await db.refresh(attempt)
+    await cache.delete_progress_dashboard(str(current_user.id))
 
     # ── Check if user needs more practice on this topic ───────────────────
     suggest_more_practice = False
@@ -398,6 +398,7 @@ async def challenge_history(
 
 # ── GET /challenges/attempts/{attempt_id} ──────────────────────────────────────
 
+
 class AttemptDetailsResponse(BaseModel):
     attempt_id: str
     challenge_id: str
@@ -444,10 +445,7 @@ async def get_attempt_details(
     result = await db.execute(
         select(ChallengeAttempt, Challenge)
         .join(Challenge, ChallengeAttempt.challenge_id == Challenge.id)
-        .where(
-            ChallengeAttempt.id == aid,
-            ChallengeAttempt.user_id == current_user.id
-        )
+        .where(ChallengeAttempt.id == aid, ChallengeAttempt.user_id == current_user.id)
     )
     row = result.first()
     if not row:

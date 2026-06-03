@@ -4,7 +4,6 @@ import pytest
 
 from services.profile_engine import (
     build_analysis_report,
-    compute_gaps,
     compute_maturity_score,
     render_analysis_markdown,
 )
@@ -61,7 +60,6 @@ SAMPLE_PROFILE = {
 
 
 class TestProfileEngine:
-
     def test_build_analysis_report_structure(self):
         report = build_analysis_report(SAMPLE_PROFILE, "testdev")
         assert report["repo_count"] == 5
@@ -69,9 +67,7 @@ class TestProfileEngine:
         assert report["maturity_score"] > 0
         assert len(report["gaps"]) >= 2
         assert len(report["priority_repos"]) == 3
-        assert report["priority_repos"][0]["name"] in (
-            "Property-app", "shell-cpp"
-        )
+        assert report["priority_repos"][0]["name"] in ("Property-app", "shell-cpp")
 
     def test_gaps_include_practice_and_repo(self):
         report = build_analysis_report(SAMPLE_PROFILE, "testdev")
@@ -93,7 +89,6 @@ class TestProfileEngine:
 
 
 class TestRoadmapEngine:
-
     @pytest.fixture
     def report(self):
         return build_analysis_report(SAMPLE_PROFILE, "testdev")
@@ -115,10 +110,12 @@ class TestRoadmapEngine:
 
     def test_roadmap_references_user_repos(self, report):
         plan = build_roadmap_plan(report, "Full Stack Engineer")
-        combined = " ".join(
-            w["project_idea"] + w["reason"] for w in plan["weeks"]
+        combined = " ".join(w["project_idea"] + w["reason"] for w in plan["weeks"])
+        assert (
+            "Property-app" in combined
+            or "shell-cpp" in combined
+            or "DevBrain" in combined
         )
-        assert "Property-app" in combined or "shell-cpp" in combined or "DevBrain" in combined
 
     def test_roadmap_skips_js_basics_for_ts_master(self, report):
         """TypeScript at 81% — plan should not start with generic JS basics."""

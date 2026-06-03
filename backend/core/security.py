@@ -36,9 +36,7 @@ def create_access_token(
     payload = data.copy()
 
     expire = datetime.now(tz=timezone.utc) + (
-        expires_delta
-        if expires_delta is not None
-        else timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+        expires_delta if expires_delta is not None else timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     )
     payload["exp"] = expire
 

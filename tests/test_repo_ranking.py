@@ -23,7 +23,6 @@ def _repo(name, *, stars=0, commits=10, size=500, code_bytes=50_000, days_ago=7)
 
 
 class TestRepoRanking:
-
     def test_large_real_project_beats_codecrafter_spam(self):
         devbrain = _repo("DevBrain", commits=120, size=4000, code_bytes=800_000)
         shell = _repo("shell-cpp", commits=200, size=80, code_bytes=5_000, days_ago=30)

@@ -128,9 +128,7 @@ async def github_analyzer_node(state: dict) -> dict:
             else:
                 token = settings.GITHUB_PAT or None
 
-            profile_data = await github_service.analyze_skill_profile(
-                github_username, token
-            )
+            profile_data = await github_service.analyze_skill_profile(github_username, token)
 
             # ── Deterministic pipeline (core logic) ────────────────────────
             analysis_report = build_analysis_report(profile_data, github_username)
@@ -178,11 +176,7 @@ async def github_analyzer_node(state: dict) -> dict:
             )
 
         async with async_session() as session:
-            result = await session.execute(
-                select(SkillProfile).where(
-                    SkillProfile.user_id == uuid.UUID(user_id)
-                )
-            )
+            result = await session.execute(select(SkillProfile).where(SkillProfile.user_id == uuid.UUID(user_id)))
             existing = result.scalar_one_or_none()
             now = datetime.utcnow()
 

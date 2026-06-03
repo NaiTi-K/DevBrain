@@ -51,7 +51,7 @@ import time
 from typing import Any
 
 TIMEOUT_SECONDS = 30
-PYTHON_TIMEOUT  = 10
+PYTHON_TIMEOUT = 10
 
 
 class CompilationError(Exception):
@@ -62,14 +62,15 @@ class CompilationError(Exception):
 # 1 ─ CODE SANITISATION
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def strip_fences(code: str) -> str:
     """Remove markdown code fences (```lang … ```) that LLMs always emit."""
     code = code.strip()
-    code = re.sub(r'^```[a-zA-Z+\-#]*\r?\n?', '', code)
-    code = re.sub(r'\n?```\s*$', '', code)
+    code = re.sub(r"^```[a-zA-Z+\-#]*\r?\n?", "", code)
+    code = re.sub(r"\n?```\s*$", "", code)
     # Second pass for rare double-fencing
-    code = re.sub(r'^```[a-zA-Z+\-#]*\r?\n?', '', code.strip())
-    code = re.sub(r'\n?```\s*$', '', code.strip())
+    code = re.sub(r"^```[a-zA-Z+\-#]*\r?\n?", "", code.strip())
+    code = re.sub(r"\n?```\s*$", "", code.strip())
     return code.strip()
 
 
@@ -81,8 +82,10 @@ def sanitize_python(code: str) -> str:
     """
     code = strip_fences(code)
     code = re.sub(
-        r'\nif\s+__name__\s*==\s*["\']__main__["\'].*', '',
-        code, flags=re.DOTALL,
+        r'\nif\s+__name__\s*==\s*["\']__main__["\'].*',
+        "",
+        code,
+        flags=re.DOTALL,
     )
     return code.strip()
 
@@ -99,34 +102,38 @@ def sanitize_cpp(code: str) -> str:
 # 2 ─ JAVA CLASS-WRAPPER STRIPPING
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _strip_java_class(code: str) -> tuple:
     """
     Brace-counting removal of  public class Solution { … }.
     Returns (method_body_str, [import_lines]).
     Handles extends, implements, extra whitespace, LLM-added main().
     """
-    imports    = re.findall(r'import\s+[^;]+;', code)
-    no_imports = re.sub(r'import\s+[^;]+;\s*\n?', '', code).strip()
+    imports = re.findall(r"import\s+[^;]+;", code)
+    no_imports = re.sub(r"import\s+[^;]+;\s*\n?", "", code).strip()
 
-    cls = re.search(r'(?:public\s+)?class\s+Solution\b[^{]*\{', no_imports)
+    cls = re.search(r"(?:public\s+)?class\s+Solution\b[^{]*\{", no_imports)
     if not cls:
         return no_imports, imports
 
     depth, i = 1, cls.end()
     while i < len(no_imports) and depth:
         c = no_imports[i]
-        if   c == '{': depth += 1
-        elif c == '}': depth -= 1
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
         i += 1
 
-    raw  = no_imports[cls.end(): i - 1] if not depth else no_imports[cls.end():]
+    raw = no_imports[cls.end() : i - 1] if not depth else no_imports[cls.end() :]
     body = textwrap.dedent(raw).strip()
 
     # Remove any LLM-generated main() so it doesn't clash with ours
     body = re.sub(
-        r'(?:public\s+)?static\s+void\s+main\s*\('
-        r'String(?:\[\])?\s+\w+\)\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}',
-        '', body,
+        r"(?:public\s+)?static\s+void\s+main\s*\("
+        r"String(?:\[\])?\s+\w+\)\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}",
+        "",
+        body,
     ).strip()
     return body, imports
 
@@ -136,59 +143,145 @@ def _strip_java_class(code: str) -> tuple:
 # ═══════════════════════════════════════════════════════════════════════════
 
 _CPP_SKIP = {
-    'main', 'toJson', 'if', 'for', 'while', 'switch', 'return',
-    'vector', 'string', 'int', 'long', 'auto', 'cout', 'cin', 'endl',
-    'sizeof', 'class', 'struct', 'template', 'typename', 'namespace',
-    'new', 'delete', 'static', 'inline', 'explicit', 'operator',
-    'throw', 'catch', 'try', 'push_back', 'emplace_back', 'begin', 'end',
-    'size', 'empty', 'find', 'insert', 'erase', 'sort', 'reverse',
-    'make_pair', 'make_shared', 'make_unique', 'Solution', 'pair',
-    'map', 'set', 'min', 'max', 'swap', 'abs', 'sqrt', 'pow',
-    'lower_bound', 'upper_bound', 'accumulate', 'count', 'fill',
-    'unique', 'distance', 'unordered_map', 'unordered_set',
-    'priority_queue', 'deque', 'stack', 'queue', 'list', 'bitset',
-    'numeric_limits', 'move', 'forward', 'next', 'prev',
+    "main",
+    "toJson",
+    "if",
+    "for",
+    "while",
+    "switch",
+    "return",
+    "vector",
+    "string",
+    "int",
+    "long",
+    "auto",
+    "cout",
+    "cin",
+    "endl",
+    "sizeof",
+    "class",
+    "struct",
+    "template",
+    "typename",
+    "namespace",
+    "new",
+    "delete",
+    "static",
+    "inline",
+    "explicit",
+    "operator",
+    "throw",
+    "catch",
+    "try",
+    "push_back",
+    "emplace_back",
+    "begin",
+    "end",
+    "size",
+    "empty",
+    "find",
+    "insert",
+    "erase",
+    "sort",
+    "reverse",
+    "make_pair",
+    "make_shared",
+    "make_unique",
+    "Solution",
+    "pair",
+    "map",
+    "set",
+    "min",
+    "max",
+    "swap",
+    "abs",
+    "sqrt",
+    "pow",
+    "lower_bound",
+    "upper_bound",
+    "accumulate",
+    "count",
+    "fill",
+    "unique",
+    "distance",
+    "unordered_map",
+    "unordered_set",
+    "priority_queue",
+    "deque",
+    "stack",
+    "queue",
+    "list",
+    "bitset",
+    "numeric_limits",
+    "move",
+    "forward",
+    "next",
+    "prev",
 }
 _JAVA_SKIP = {
-    'main', 'Solution', 'toJson', 'println', 'toString', 'valueOf',
-    'equals', 'hashCode', 'getClass', 'compareTo', 'charAt', 'length',
-    'get', 'set', 'add', 'remove', 'size', 'isEmpty', 'containsKey',
+    "main",
+    "Solution",
+    "toJson",
+    "println",
+    "toString",
+    "valueOf",
+    "equals",
+    "hashCode",
+    "getClass",
+    "compareTo",
+    "charAt",
+    "length",
+    "get",
+    "set",
+    "add",
+    "remove",
+    "size",
+    "isEmpty",
+    "containsKey",
 }
 _PY_SKIP = {
-    '__init__', '__repr__', '__str__', '__eq__', '__hash__',
-    '__new__', '__del__', '__len__', '__iter__', '__next__',
+    "__init__",
+    "__repr__",
+    "__str__",
+    "__eq__",
+    "__hash__",
+    "__new__",
+    "__del__",
+    "__len__",
+    "__iter__",
+    "__next__",
 }
 
 
 def extract_cpp_info(code: str) -> tuple:
     """Return (func_name, needs_solution_instance)."""
-    has_class = bool(re.search(r'class\s+Solution\s*[:{]', code))
+    has_class = bool(re.search(r"class\s+Solution\s*[:{]", code))
 
     # Restrict search code to Solution class body to prevent matching helper constructs
     search_code = code
     if has_class:
-        match = re.search(r'class\s+Solution\s*[:{]', code)
+        match = re.search(r"class\s+Solution\s*[:{]", code)
         if match:
-            depth, i = 1, code.find('{', match.start()) + 1
+            depth, i = 1, code.find("{", match.start()) + 1
             if i > 0:
                 while i < len(code) and depth > 0:
                     c = code[i]
-                    if c == '{': depth += 1
-                    elif c == '}': depth -= 1
+                    if c == "{":
+                        depth += 1
+                    elif c == "}":
+                        depth -= 1
                     i += 1
-                search_code = code[match.start():i]
+                search_code = code[match.start() : i]
 
     # Look for C++ method pattern with type, name, params, optional const, and opening brace
-    pat = re.compile(
-        r'\b[a-zA-Z0-9_<>]+\s+(\w+)\s*\([^)]*\)\s*(?:const\s*)?\{'
-    )
+    pat = re.compile(r"\b[a-zA-Z0-9_<>]+\s+(\w+)\s*\([^)]*\)\s*(?:const\s*)?\{")
     for m in pat.finditer(search_code):
         name = m.group(1)
         if name not in _CPP_SKIP:
             return name, has_class
 
     # Fallback to standard check inside search_code
-    for m in re.finditer(r'\b(\w+)\s*\(', search_code):
+    for m in re.finditer(r"\b(\w+)\s*\(", search_code):
         name = m.group(1)
         if name not in _CPP_SKIP:
             return name, has_class
@@ -200,39 +293,42 @@ def extract_java_info(code: str) -> tuple:
     """Return (method_name, is_static)."""
     # Restrict search code to Solution class body to prevent matching helper constructs
     search_code = code
-    match = re.search(r'(?:public\s+)?class\s+Solution\b[^{]*\{', code)
+    match = re.search(r"(?:public\s+)?class\s+Solution\b[^{]*\{", code)
     if match:
-        depth, i = 1, code.find('{', match.start()) + 1
+        depth, i = 1, code.find("{", match.start()) + 1
         if i > 0:
             while i < len(code) and depth > 0:
                 c = code[i]
-                if c == '{': depth += 1
-                elif c == '}': depth -= 1
+                if c == "{":
+                    depth += 1
+                elif c == "}":
+                    depth -= 1
                 i += 1
-            search_code = code[match.start():i]
+            search_code = code[match.start() : i]
 
     # Look for Java method pattern: optional modifiers, return type, name, params, opening brace
     pat = re.compile(
-        r'\b(?:public|protected|private\s+)?(static\s+)?(?:[a-zA-Z0-9_<>[\]]+)\s+(\w+)\s*\([^)]*\)\s*(?:throws\s+[a-zA-Z0-9_,\\s]+)?\{'
+        r"\b(?:public|protected|private\s+)?(static\s+)?(?:[a-zA-Z0-9_<>[\]]+)\s+(\w+)\s*\([^)]*\)\s*(?:throws\s+[a-zA-Z0-9_,\\s]+)?\{"
     )
     for m in pat.finditer(search_code):
         name = m.group(2)
         if name not in _JAVA_SKIP:
             return name, bool(m.group(1))
 
-    for m in re.finditer(r'\b(\w+)\s*\(', search_code):
+    for m in re.finditer(r"\b(\w+)\s*\(", search_code):
         name = m.group(1)
         if name not in _JAVA_SKIP:
             return name, False
 
     raise ValueError("extract_java_info: cannot locate method name")
 
+
 def extract_python_name(code: str) -> str:
     """Find first non-dunder def at any indentation level."""
-    for m in re.finditer(r'^def\s+(\w+)\s*\(', code, re.MULTILINE):
+    for m in re.finditer(r"^def\s+(\w+)\s*\(", code, re.MULTILINE):
         if m.group(1) not in _PY_SKIP:
             return m.group(1)
-    for m in re.finditer(r'def\s+(\w+)\s*\(', code):
+    for m in re.finditer(r"def\s+(\w+)\s*\(", code):
         if m.group(1) not in _PY_SKIP:
             return m.group(1)
     raise ValueError("extract_python_name: cannot locate function name")
@@ -242,16 +338,22 @@ def extract_python_name(code: str) -> str:
 # 4 ─ LITERAL TRANSPILERS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _esc(s: str) -> str:
-    return str(s).replace('\\', '\\\\').replace('"', '\\"')
+    return str(s).replace("\\", "\\\\").replace('"', '\\"')
 
 
 def format_cpp_literal(val, typ: str) -> str:
-    if typ in ("int", "long"):      return str(int(val))
-    if typ in ("float", "double"):  return repr(float(val))
-    if typ == "bool":               return "true" if val else "false"
-    if typ == "string":             return '"' + _esc(str(val)) + '"'
-    if typ == "char":               return "'" + str(val) + "'"
+    if typ in ("int", "long"):
+        return str(int(val))
+    if typ in ("float", "double"):
+        return repr(float(val))
+    if typ == "bool":
+        return "true" if val else "false"
+    if typ == "string":
+        return '"' + _esc(str(val)) + '"'
+    if typ == "char":
+        return "'" + str(val) + "'"
     if typ == "int[]":
         return "vector<int>{" + ", ".join(str(int(x)) for x in val) + "}"
     if typ == "long[]":
@@ -269,27 +371,35 @@ def format_cpp_literal(val, typ: str) -> str:
         rows = ", ".join("{" + ", ".join(str(int(x)) for x in row) + "}" for row in val)
         return "vector<vector<int>>{" + rows + "}"
     if typ == "string[][]":
-        rows = ", ".join(
-            "{" + ", ".join('"' + _esc(str(x)) + '"' for x in row) + "}"
-            for row in val
-        )
+        rows = ", ".join("{" + ", ".join('"' + _esc(str(x)) + '"' for x in row) + "}" for row in val)
         return "vector<vector<string>>{" + rows + "}"
     if typ in ("List<int>", "List<string>", "List<List<int>>"):
-        return format_cpp_literal(val, {
-            "List<int>": "int[]", "List<string>": "string[]",
-            "List<List<int>>": "int[][]",
-        }[typ])
+        return format_cpp_literal(
+            val,
+            {
+                "List<int>": "int[]",
+                "List<string>": "string[]",
+                "List<List<int>>": "int[][]",
+            }[typ],
+        )
     raise ValueError(f"format_cpp_literal: unsupported type '{typ}'")
 
 
 def format_java_literal(val, typ: str) -> str:
-    if typ == "int":     return str(int(val))
-    if typ == "long":    return str(int(val)) + "L"
-    if typ == "float":   return repr(float(val)) + "f"
-    if typ == "double":  return repr(float(val))
-    if typ == "bool":    return "true" if val else "false"
-    if typ == "string":  return '"' + _esc(str(val)) + '"'
-    if typ == "char":    return "'" + str(val) + "'"
+    if typ == "int":
+        return str(int(val))
+    if typ == "long":
+        return str(int(val)) + "L"
+    if typ == "float":
+        return repr(float(val)) + "f"
+    if typ == "double":
+        return repr(float(val))
+    if typ == "bool":
+        return "true" if val else "false"
+    if typ == "string":
+        return '"' + _esc(str(val)) + '"'
+    if typ == "char":
+        return "'" + str(val) + "'"
     if typ == "int[]":
         return "new int[]{" + ", ".join(str(int(x)) for x in val) + "}"
     if typ == "long[]":
@@ -307,16 +417,17 @@ def format_java_literal(val, typ: str) -> str:
         rows = ", ".join("{" + ", ".join(str(int(x)) for x in row) + "}" for row in val)
         return "new int[][]{" + rows + "}"
     if typ == "string[][]":
-        rows = ", ".join(
-            "{" + ", ".join('"' + _esc(str(x)) + '"' for x in row) + "}"
-            for row in val
-        )
+        rows = ", ".join("{" + ", ".join('"' + _esc(str(x)) + '"' for x in row) + "}" for row in val)
         return "new String[][]{" + rows + "}"
     if typ in ("List<int>", "List<string>", "List<List<int>>"):
-        return format_java_literal(val, {
-            "List<int>": "int[]", "List<string>": "string[]",
-            "List<List<int>>": "int[][]",
-        }[typ])
+        return format_java_literal(
+            val,
+            {
+                "List<int>": "int[]",
+                "List<string>": "string[]",
+                "List<List<int>>": "int[][]",
+            }[typ],
+        )
     raise ValueError(f"format_java_literal: unsupported type '{typ}'")
 
 
@@ -324,17 +435,26 @@ def format_java_literal(val, typ: str) -> str:
 # 5 ─ TYPE MAPPINGS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def schema_to_cpp_type(t: str) -> str:
     m = {
-        "int": "int", "long": "long long",
-        "float": "float", "double": "double",
-        "bool": "bool", "string": "string", "char": "char",
-        "int[]": "vector<int>", "long[]": "vector<long long>",
-        "float[]": "vector<float>", "double[]": "vector<double>",
-        "bool[]": "vector<bool>", "string[]": "vector<string>",
+        "int": "int",
+        "long": "long long",
+        "float": "float",
+        "double": "double",
+        "bool": "bool",
+        "string": "string",
+        "char": "char",
+        "int[]": "vector<int>",
+        "long[]": "vector<long long>",
+        "float[]": "vector<float>",
+        "double[]": "vector<double>",
+        "bool[]": "vector<bool>",
+        "string[]": "vector<string>",
         "int[][]": "vector<vector<int>>",
         "string[][]": "vector<vector<string>>",
-        "List<int>": "vector<int>", "List<string>": "vector<string>",
+        "List<int>": "vector<int>",
+        "List<string>": "vector<string>",
         "List<List<int>>": "vector<vector<int>>",
     }
     if t not in m:
@@ -344,14 +464,23 @@ def schema_to_cpp_type(t: str) -> str:
 
 def schema_to_java_type(t: str) -> str:
     m = {
-        "int": "int", "long": "long",
-        "float": "float", "double": "double",
-        "bool": "boolean", "string": "String", "char": "char",
-        "int[]": "int[]", "long[]": "long[]",
-        "float[]": "float[]", "double[]": "double[]",
-        "bool[]": "boolean[]", "string[]": "String[]",
-        "int[][]": "int[][]", "string[][]": "String[][]",
-        "List<int>": "int[]", "List<string>": "String[]",
+        "int": "int",
+        "long": "long",
+        "float": "float",
+        "double": "double",
+        "bool": "boolean",
+        "string": "String",
+        "char": "char",
+        "int[]": "int[]",
+        "long[]": "long[]",
+        "float[]": "float[]",
+        "double[]": "double[]",
+        "bool[]": "boolean[]",
+        "string[]": "String[]",
+        "int[][]": "int[][]",
+        "string[][]": "String[][]",
+        "List<int>": "int[]",
+        "List<string>": "String[]",
         "List<List<int>>": "int[][]",
     }
     if t not in m:
@@ -404,17 +533,17 @@ string toJson(const vector<T>& v) {
 
 
 def build_cpp_main(schema: dict, test_cases: list, user_code: str) -> str:
-    params             = schema.get("params", [])
+    params = schema.get("params", [])
     func_name, has_cls = extract_cpp_info(user_code)
-    is_void            = bool(re.search(r'\bvoid\s+' + re.escape(func_name) + r'\s*\(', user_code))
-    call_prefix        = "_sol." if has_cls else ""
-    instance_decl      = "    Solution _sol;\n" if has_cls else ""
+    is_void = bool(re.search(r"\bvoid\s+" + re.escape(func_name) + r"\s*\(", user_code))
+    call_prefix = "_sol." if has_cls else ""
+    instance_decl = "    Solution _sol;\n" if has_cls else ""
 
     lines = []
     for i, tc in enumerate(test_cases):
         for p in params:
             try:
-                lit   = format_cpp_literal(tc["input"][p["name"]], p["type"])
+                lit = format_cpp_literal(tc["input"][p["name"]], p["type"])
                 ctype = schema_to_cpp_type(p["type"])
                 lines.append("    " + ctype + " p" + str(i) + "_" + p["name"] + " = " + lit + ";")
             except Exception as e:
@@ -432,10 +561,12 @@ def build_cpp_main(schema: dict, test_cases: list, user_code: str) -> str:
 
     return (
         _CPP_HEADER
-        + user_code.rstrip() + "\n\n"
+        + user_code.rstrip()
+        + "\n\n"
         + "int main() {\n"
         + instance_decl
-        + "\n".join(lines) + "\n"
+        + "\n".join(lines)
+        + "\n"
         + "    return 0;\n}\n"
     )
 
@@ -445,10 +576,11 @@ def build_cpp_main(schema: dict, test_cases: list, user_code: str) -> str:
 #     chr() is used for ", ', \ to avoid Python/Java string-escape conflicts.
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _build_java_header() -> str:
-    Q = chr(34)   # "
-    S = chr(39)   # '
-    B = chr(92)   # \
+    Q = chr(34)  # "
+    S = chr(39)  # '
+    B = chr(92)  # \
     lines = [
         "import java.util.*;",
         "import java.util.stream.*;",
@@ -572,14 +704,14 @@ def build_java_main(schema: dict, test_cases: list, user_code: str) -> str:
     except ValueError:
         func_name, is_static = "solution", False
 
-    is_void = bool(re.search(r'\bvoid\s+' + re.escape(func_name) + r'\s*\(', analysis_src))
-    caller  = ("Solution." if is_static else "sol.") + func_name
+    is_void = bool(re.search(r"\bvoid\s+" + re.escape(func_name) + r"\s*\(", analysis_src))
+    caller = ("Solution." if is_static else "sol.") + func_name
 
     lines = []
     for i, tc in enumerate(test_cases):
         for p in params:
             try:
-                lit   = format_java_literal(tc["input"][p["name"]], p["type"])
+                lit = format_java_literal(tc["input"][p["name"]], p["type"])
                 jtype = schema_to_java_type(p["type"])
                 lines.append("        " + jtype + " p" + str(i) + "_" + p["name"] + " = " + lit + ";")
             except Exception as e:
@@ -593,25 +725,31 @@ def build_java_main(schema: dict, test_cases: list, user_code: str) -> str:
             lines.append('        System.out.println("<<RESULT:' + str(i) + '>>" + ' + out + ' + "<<END>>");')
         else:
             lines.append(
-                '        System.out.println("<<RESULT:' + str(i) + '>>" + toJson(' + caller + '(' + args + ')) + "<<END>>");'
+                '        System.out.println("<<RESULT:'
+                + str(i)
+                + '>>" + toJson('
+                + caller
+                + "("
+                + args
+                + ')) + "<<END>>");'
             )
 
     test_calls = "\n".join(lines)
     import_str = "\n".join(imports) + "\n" if imports else ""
 
     # Re-indent method body 4 spaces to sit inside the class
-    indented_body = "\n".join(
-        ("    " + line) if line.strip() else ""
-        for line in method_body.splitlines()
-    )
+    indented_body = "\n".join(("    " + line) if line.strip() else "" for line in method_body.splitlines())
 
     return (
         import_str
-        + _JAVA_HEADER + "\n"
-        + indented_body + "\n\n"
+        + _JAVA_HEADER
+        + "\n"
+        + indented_body
+        + "\n\n"
         + "    public static void main(String[] args) {\n"
         + "        Solution sol = new Solution();\n"
-        + test_calls + "\n"
+        + test_calls
+        + "\n"
         + "    }\n"
         + "}\n"
     )
@@ -647,7 +785,7 @@ def build_python_runner(schema: dict, test_cases: list, user_code: str) -> str:
     • Per-test try/except so one crash doesn't kill the rest
     • Sentinel output  <<RESULT:N>>…<<END>>
     """
-    has_class = bool(re.search(r'class\s+Solution\b', user_code))
+    has_class = bool(re.search(r"class\s+Solution\b", user_code))
 
     params = schema.get("params", [])
     pnames = [p["name"] for p in params]
@@ -655,17 +793,15 @@ def build_python_runner(schema: dict, test_cases: list, user_code: str) -> str:
 
     if has_class:
         try:
-            fname   = extract_python_name(user_code)
-            call_t  = f"Solution().{fname}({arg_str})"
+            fname = extract_python_name(user_code)
+            call_t = f"Solution().{fname}({arg_str})"
         except ValueError:
             call_t = (
-                f"(lambda sol: getattr(sol, "
-                f"next(m for m in dir(sol) if not m.startswith('_')))"
-                f"({arg_str}))(Solution())"
+                f"(lambda sol: getattr(sol, next(m for m in dir(sol) if not m.startswith('_')))({arg_str}))(Solution())"
             )
     else:
         try:
-            fname  = extract_python_name(user_code)
+            fname = extract_python_name(user_code)
             call_t = f"{fname}({arg_str})"
         except ValueError:
             call_t = f"solution({arg_str})"
@@ -691,12 +827,12 @@ def build_python_runner(schema: dict, test_cases: list, user_code: str) -> str:
 # 9 ─ SENTINEL OUTPUT PARSER
 # ═══════════════════════════════════════════════════════════════════════════
 
-_SENTINEL_RE = re.compile(r'<<RESULT:(\d+)>>(.*?)<<END>>', re.DOTALL)
+_SENTINEL_RE = re.compile(r"<<RESULT:(\d+)>>(.*?)<<END>>", re.DOTALL)
 
 
 def _parse_results(stdout: str, n: int) -> list:
     """Extract per-case output strings; missing cases return empty string."""
-    results = [''] * n
+    results = [""] * n
     for m in _SENTINEL_RE.finditer(stdout):
         idx = int(m.group(1))
         if 0 <= idx < n:
@@ -708,9 +844,12 @@ def _parse_results(stdout: str, n: int) -> list:
 # 10 ─ OUTPUT COMPARISON
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _normalize(val: Any) -> Any:
-    if isinstance(val, tuple): return [_normalize(v) for v in val]
-    if isinstance(val, list):  return [_normalize(v) for v in val]
+    if isinstance(val, tuple):
+        return [_normalize(v) for v in val]
+    if isinstance(val, list):
+        return [_normalize(v) for v in val]
     return val
 
 
@@ -725,17 +864,19 @@ def _floats_close(a: Any, b: Any, tol: float) -> bool:
 
 
 def compare_outputs(actual: str, expected_val, judge: str) -> bool:
-    actual = (actual or '').strip()
+    actual = (actual or "").strip()
 
     # Null / None handling
-    if actual == 'null':
+    if actual == "null":
         exp = expected_val
         if isinstance(exp, str):
-            try: exp = json.loads(exp)
-            except Exception: pass
+            try:
+                exp = json.loads(exp)
+            except Exception:
+                pass
         return exp is None
 
-    if not actual or actual.startswith('[ERR'):
+    if not actual or actual.startswith("[ERR"):
         return False
 
     try:
@@ -744,12 +885,14 @@ def compare_outputs(actual: str, expected_val, judge: str) -> bool:
         actual_parsed = actual
 
     if isinstance(expected_val, str):
-        try:    expected_parsed = json.loads(expected_val.strip())
-        except json.JSONDecodeError: expected_parsed = expected_val.strip()
+        try:
+            expected_parsed = json.loads(expected_val.strip())
+        except json.JSONDecodeError:
+            expected_parsed = expected_val.strip()
     else:
         expected_parsed = expected_val
 
-    actual_n   = _normalize(actual_parsed)
+    actual_n = _normalize(actual_parsed)
     expected_n = _normalize(expected_parsed)
 
     if judge == "exact":
@@ -758,8 +901,7 @@ def compare_outputs(actual: str, expected_val, judge: str) -> bool:
     if judge == "any_order":
         if isinstance(actual_n, list) and isinstance(expected_n, list):
             try:
-                return (sorted(str(x) for x in actual_n) ==
-                        sorted(str(x) for x in expected_n))
+                return sorted(str(x) for x in actual_n) == sorted(str(x) for x in expected_n)
             except Exception:
                 pass
         return actual_n == expected_n
@@ -778,14 +920,20 @@ def compare_outputs(actual: str, expected_val, judge: str) -> bool:
 # 11 ─ SCHEMA / INPUT HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _infer_type(val) -> str:
     # bool MUST come before int (bool is a subclass of int in Python)
-    if isinstance(val, bool):  return "bool"
-    if isinstance(val, int):   return "int"
-    if isinstance(val, float): return "double"
-    if isinstance(val, str):   return "string"
+    if isinstance(val, bool):
+        return "bool"
+    if isinstance(val, int):
+        return "int"
+    if isinstance(val, float):
+        return "double"
+    if isinstance(val, str):
+        return "string"
     if isinstance(val, list):
-        if not val: return "int[]"
+        if not val:
+            return "int[]"
         if isinstance(val[0], list):
             return "string[][]" if (val[0] and isinstance(val[0][0], str)) else "int[][]"
         return "string[]" if isinstance(val[0], str) else "int[]"
@@ -810,8 +958,8 @@ def _ensure_params(schema: dict, test_cases: list) -> list:
 # 12 ─ EXECUTION CORE
 # ═══════════════════════════════════════════════════════════════════════════
 
-def run_code(language: str, user_code: str, schema: dict,
-             test_cases: list, judge: str) -> dict:
+
+def run_code(language: str, user_code: str, schema: dict, test_cases: list, judge: str) -> dict:
     lang = language.lower().strip()
     schema["params"] = _ensure_params(schema, test_cases)
 
@@ -854,12 +1002,14 @@ def run_code(language: str, user_code: str, schema: dict,
 
     test_results, overall = [], "AC"
     for i, tc in enumerate(test_cases):
-        actual  = case_outputs[i]
+        actual = case_outputs[i]
         raw_exp = tc.get("expected", "")
 
         if isinstance(raw_exp, str):
-            try:    exp_parsed = json.loads(raw_exp.strip())
-            except json.JSONDecodeError: exp_parsed = raw_exp.strip()
+            try:
+                exp_parsed = json.loads(raw_exp.strip())
+            except json.JSONDecodeError:
+                exp_parsed = raw_exp.strip()
         else:
             exp_parsed = raw_exp
 
@@ -868,16 +1018,18 @@ def run_code(language: str, user_code: str, schema: dict,
         if status == "WA":
             overall = "WA"
 
-        test_results.append({
-            "case":     i,
-            "status":   status,
-            "stdout":   actual,
-            "expected": json.dumps(exp_parsed),
-        })
+        test_results.append(
+            {
+                "case": i,
+                "status": status,
+                "stdout": actual,
+                "expected": json.dumps(exp_parsed),
+            }
+        )
 
     return {
-        "status":       overall,
-        "stderr":       result.get("stderr", ""),
+        "status": overall,
+        "stderr": result.get("stderr", ""),
         "test_results": test_results,
     }
 
@@ -886,6 +1038,7 @@ def run_code(language: str, user_code: str, schema: dict,
 # 13 ─ LANGUAGE RUNNERS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _compile_and_run_cpp(source: str) -> dict:
     with tempfile.TemporaryDirectory() as d:
         with open(os.path.join(d, "sol.cpp"), "w", encoding="utf-8") as f:
@@ -893,15 +1046,25 @@ def _compile_and_run_cpp(source: str) -> dict:
 
         proc = subprocess.run(
             [
-                "docker", "run", "--rm",
-                "-v", d + ":/app", "-w", "/app",
-                "--memory=256m", "--cpus=1",
-                "gcc:13", "sh", "-c",
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                d + ":/app",
+                "-w",
+                "/app",
+                "--memory=256m",
+                "--cpus=1",
+                "gcc:13",
+                "sh",
+                "-c",
                 "g++ -O2 -std=c++17 -o sol sol.cpp && timeout 5 ./sol",
             ],
-            capture_output=True, text=True, timeout=TIMEOUT_SECONDS,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT_SECONDS,
         )
-        if proc.returncode != 0 and re.search(r'\berror:', proc.stderr):
+        if proc.returncode != 0 and re.search(r"\berror:", proc.stderr):
             raise CompilationError(proc.stderr)
         return {"returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
 
@@ -920,11 +1083,20 @@ def _compile_and_run_java(source: str) -> dict:
         # Step 1: compile
         cc = subprocess.run(
             [
-                "docker", "run", "--rm",
-                "-v", d + ":/app", "-w", "/app",
-                "eclipse-temurin:21-jdk", "javac", "Solution.java",
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                d + ":/app",
+                "-w",
+                "/app",
+                "eclipse-temurin:21-jdk",
+                "javac",
+                "Solution.java",
             ],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if cc.returncode != 0:
             raise CompilationError(cc.stderr)
@@ -932,13 +1104,24 @@ def _compile_and_run_java(source: str) -> dict:
         # Step 2: execute
         run = subprocess.run(
             [
-                "docker", "run", "--rm",
-                "-v", d + ":/app", "-w", "/app",
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                d + ":/app",
+                "-w",
+                "/app",
                 "--memory=256m",
                 "eclipse-temurin:21-jdk",
-                "timeout", "5", "java", "-Xmx256m", "Solution",
+                "timeout",
+                "5",
+                "java",
+                "-Xmx256m",
+                "Solution",
             ],
-            capture_output=True, text=True, timeout=TIMEOUT_SECONDS,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT_SECONDS,
         )
         return {"returncode": run.returncode, "stdout": run.stdout, "stderr": run.stderr}
 
@@ -950,13 +1133,23 @@ def _run_python(source: str) -> dict:
 
         proc = subprocess.run(
             [
-                "docker", "run", "--rm",
-                "-v", d + ":/app", "-w", "/app",
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                d + ":/app",
+                "-w",
+                "/app",
                 "--memory=256m",
                 "python:3.12-alpine",
-                "timeout", "5", "python3", "solution.py",
+                "timeout",
+                "5",
+                "python3",
+                "solution.py",
             ],
-            capture_output=True, text=True, timeout=PYTHON_TIMEOUT,
+            capture_output=True,
+            text=True,
+            timeout=PYTHON_TIMEOUT,
         )
         return {"returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
 
@@ -964,6 +1157,7 @@ def _run_python(source: str) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════
 # 14 ─ UTILITY METHODS  (preserved + unified from v1)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 async def check_syntax(code: str, language: str = "python") -> dict:
     lang = language.lower()
@@ -978,14 +1172,14 @@ async def check_syntax(code: str, language: str = "python") -> dict:
             return {"ok": False, "error": str(e)}
 
     docker_cmds = {
-        "javascript": ("node:20-alpine",        ["node", "-c", "solution.js"],                         "solution.js"),
-        "js":         ("node:20-alpine",        ["node", "-c", "solution.js"],                         "solution.js"),
-        "typescript": ("node:20-alpine",        ["node", "-c", "solution.js"],                         "solution.js"),
-        "ts":         ("node:20-alpine",        ["node", "-c", "solution.js"],                         "solution.js"),
-        "cpp":        ("gcc:13",                ["g++", "-fsyntax-only", "-std=c++17", "solution.cpp"], "solution.cpp"),
-        "c++":        ("gcc:13",                ["g++", "-fsyntax-only", "-std=c++17", "solution.cpp"], "solution.cpp"),
-        "c":          ("gcc:13",                ["g++", "-fsyntax-only", "-std=c++17", "solution.cpp"], "solution.cpp"),
-        "java":       ("eclipse-temurin:21-jdk", ["javac", "Solution.java"],                           "Solution.java"),
+        "javascript": ("node:20-alpine", ["node", "-c", "solution.js"], "solution.js"),
+        "js": ("node:20-alpine", ["node", "-c", "solution.js"], "solution.js"),
+        "typescript": ("node:20-alpine", ["node", "-c", "solution.js"], "solution.js"),
+        "ts": ("node:20-alpine", ["node", "-c", "solution.js"], "solution.js"),
+        "cpp": ("gcc:13", ["g++", "-fsyntax-only", "-std=c++17", "solution.cpp"], "solution.cpp"),
+        "c++": ("gcc:13", ["g++", "-fsyntax-only", "-std=c++17", "solution.cpp"], "solution.cpp"),
+        "c": ("gcc:13", ["g++", "-fsyntax-only", "-std=c++17", "solution.cpp"], "solution.cpp"),
+        "java": ("eclipse-temurin:21-jdk", ["javac", "Solution.java"], "Solution.java"),
     }
 
     if lang not in docker_cmds:
@@ -1000,10 +1194,13 @@ async def check_syntax(code: str, language: str = "python") -> dict:
             proc = await asyncio.to_thread(
                 subprocess.run,
                 ["docker", "run", "--rm", "-v", d + ":/app", "-w", "/app", image] + cmd,
-                capture_output=True, timeout=5.0, text=True, errors="replace",
+                capture_output=True,
+                timeout=5.0,
+                text=True,
+                errors="replace",
             )
             return {
-                "ok":    proc.returncode == 0,
+                "ok": proc.returncode == 0,
                 "error": proc.stderr.strip() if proc.returncode != 0 else None,
             }
         except subprocess.TimeoutExpired:
@@ -1016,8 +1213,10 @@ async def benchmark_code(code: str, language: str = "python") -> dict:
     if "solution" not in code.lower() and "main" not in code.lower():
         return {"ok": False, "median_ms": -1.0}
     start = time.perf_counter()
-    res   = await asyncio.to_thread(
-        run_code, language, code,
+    res = await asyncio.to_thread(
+        run_code,
+        language,
+        code,
         {"params": [], "returns": "int"},
         [{"input": {}, "expected": 1}],
         "exact",

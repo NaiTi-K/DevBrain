@@ -39,12 +39,8 @@ class ProgressSnapshot(Base):
     skills_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
     # ── Challenge metrics ─────────────────────────────────────────────────────
-    challenges_done: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
-    challenges_passed: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
+    challenges_done: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    challenges_passed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # ── Review metrics ────────────────────────────────────────────────────────
     reviews_done: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -61,9 +57,7 @@ class ProgressSnapshot(Base):
     )
 
     # ── Constraints ───────────────────────────────────────────────────────────
-    __table_args__ = (
-        UniqueConstraint("user_id", "snapshot_date", name="uq_progress_user_date"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "snapshot_date", name="uq_progress_user_date"),)
 
     # ── Relationships ─────────────────────────────────────────────────────────
     user: Mapped["User"] = relationship(  # type: ignore[name-defined]  # noqa: F821
@@ -81,7 +75,4 @@ class ProgressSnapshot(Base):
         self.skills_snapshot = value
 
     def __repr__(self) -> str:
-        return (
-            f"<ProgressSnapshot user_id={self.user_id} "
-            f"date={self.snapshot_date} streak={self.streak_days}>"
-        )
+        return f"<ProgressSnapshot user_id={self.user_id} date={self.snapshot_date} streak={self.streak_days}>"

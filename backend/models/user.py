@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from models.skill_profile import SkillProfile
 
+
 class User(Base):
     __tablename__ = "users"
 
@@ -106,9 +107,7 @@ class User(Base):
     )
 
     # ── Additional index ──────────────────────────────────────────────────────
-    __table_args__ = (
-        Index("ix_users_github_username", "github_username"),
-    )
+    __table_args__ = (Index("ix_users_github_username", "github_username"),)
 
     @property
     def skill_profile(self) -> "SkillProfile" | None:

@@ -32,18 +32,34 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 _OFFICIAL_DOCS_DOMAINS = {
-    "docs.python.org", "docs.djangoproject.com", "fastapi.tiangolo.com",
-    "react.dev", "nextjs.org", "docs.docker.com", "kubernetes.io",
-    "developer.mozilla.org", "docs.github.com", "postgresql.org",
-    "redis.io", "docs.aws.amazon.com", "cloud.google.com",
-    "learn.microsoft.com", "docs.sqlalchemy.org", "langchain.com",
+    "docs.python.org",
+    "docs.djangoproject.com",
+    "fastapi.tiangolo.com",
+    "react.dev",
+    "nextjs.org",
+    "docs.docker.com",
+    "kubernetes.io",
+    "developer.mozilla.org",
+    "docs.github.com",
+    "postgresql.org",
+    "redis.io",
+    "docs.aws.amazon.com",
+    "cloud.google.com",
+    "learn.microsoft.com",
+    "docs.sqlalchemy.org",
+    "langchain.com",
     "python.langchain.com",
 }
 _GITHUB_DOMAIN = "github.com"
 _TUTORIAL_DOMAINS = {
-    "realpython.com", "testdriven.io", "css-tricks.com",
-    "digitalocean.com", "scotch.io", "tutorialspoint.com",
-    "w3schools.com", "geeksforgeeks.org",
+    "realpython.com",
+    "testdriven.io",
+    "css-tricks.com",
+    "digitalocean.com",
+    "scotch.io",
+    "tutorialspoint.com",
+    "w3schools.com",
+    "geeksforgeeks.org",
 }
 
 
@@ -122,6 +138,7 @@ def _get_skill_level(state: DevBrainState, topic: str) -> str:
 # Agent node
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def resource_agent_node(state: DevBrainState) -> DevBrainState:
     """
     RAG-powered resource finder.
@@ -174,7 +191,7 @@ async def resource_agent_node(state: DevBrainState) -> DevBrainState:
         needed = 3 - len(high_confidence)
         try:
             raw_web = await search_service.search_resources(topic, difficulty=skill_level)
-            web_results = raw_web[:needed + 2]  # fetch a few extra before dedup
+            web_results = raw_web[: needed + 2]  # fetch a few extra before dedup
 
             # Back-fill ChromaDB so next search for the same topic is faster
             add_tasks = [
@@ -206,10 +223,7 @@ async def resource_agent_node(state: DevBrainState) -> DevBrainState:
             "why_recommended": "",  # filled in after ranking
         }
 
-    all_resources = (
-        [_normalise(r, "chromadb") for r in chroma_results]
-        + [_normalise(r, "web") for r in web_results]
-    )
+    all_resources = [_normalise(r, "chromadb") for r in chroma_results] + [_normalise(r, "web") for r in web_results]
     ranked = _rank_resources(all_resources)[:8]  # top 8
 
     # Fill why_recommended based on source
@@ -225,10 +239,7 @@ async def resource_agent_node(state: DevBrainState) -> DevBrainState:
             r["why_recommended"] = "Community resource with relevant coverage of the topic."
 
     # ── Step 6: learning path narrative ───────────────────────────────────
-    resource_titles = "\n".join(
-        f"{i+1}. {r['title']} ({r['url']})"
-        for i, r in enumerate(ranked[:6])
-    )
+    resource_titles = "\n".join(f"{i + 1}. {r['title']} ({r['url']})" for i, r in enumerate(ranked[:6]))
     learning_path = ""
     try:
         learning_path = await llm.call(
@@ -269,7 +280,7 @@ async def resource_agent_node(state: DevBrainState) -> DevBrainState:
     }
 
     formatted_list = "\n".join(
-        f"{i+1}. [{r['title']}]({r['url']}) — {r['difficulty']} — {r['why_recommended']}"
+        f"{i + 1}. [{r['title']}]({r['url']}) — {r['difficulty']} — {r['why_recommended']}"
         for i, r in enumerate(output_resources)
     )
     state["agent_output"] = f"{learning_path}\n\n**Resources:**\n{formatted_list}"

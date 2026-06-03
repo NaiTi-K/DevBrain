@@ -154,6 +154,8 @@ async def generate_roadmap(
             detail="Roadmap was generated but could not be retrieved.",
         )
 
+    await cache.delete_progress_dashboard(user_id)
+
     return RoadmapResponse(
         id=str(roadmap.id),
         user_id=str(roadmap.user_id),
@@ -234,9 +236,7 @@ async def patch_roadmap(
             detail="roadmap_id must be a valid UUID.",
         )
 
-    result = await db.execute(
-        select(Roadmap).where(Roadmap.id == rid, Roadmap.user_id == current_user.id)
-    )
+    result = await db.execute(select(Roadmap).where(Roadmap.id == rid, Roadmap.user_id == current_user.id))
     roadmap: Optional[Roadmap] = result.scalar_one_or_none()
 
     if not roadmap:
@@ -250,6 +250,7 @@ async def patch_roadmap(
     roadmap.plan = merged_plan
     await db.commit()
     await db.refresh(roadmap)
+    await cache.delete_progress_dashboard(str(current_user.id))
 
     return RoadmapResponse(
         id=str(roadmap.id),

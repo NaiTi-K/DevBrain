@@ -24,12 +24,29 @@ logger = logging.getLogger(__name__)
 
 # ── Validation ─────────────────────────────────────────────────────────────
 VALID_TYPES = {
-    "int", "long", "float", "double", "bool", "string", "char",
-    "int[]", "long[]", "float[]", "double[]", "bool[]", "string[]", "char[]",
-    "int[][]", "string[][]", "List<int>", "List<string>", "List<List<int>>"
+    "int",
+    "long",
+    "float",
+    "double",
+    "bool",
+    "string",
+    "char",
+    "int[]",
+    "long[]",
+    "float[]",
+    "double[]",
+    "bool[]",
+    "string[]",
+    "char[]",
+    "int[][]",
+    "string[][]",
+    "List<int>",
+    "List<string>",
+    "List<List<int>>",
 }
 
 VALID_JUDGES = {"exact", "any_order"}
+
 
 def validate_and_fix_challenge(parsed: dict) -> None:
     """Raises ValueError if invalid, and auto-fixes structural anomalies from LLMs."""
@@ -51,10 +68,7 @@ def validate_and_fix_challenge(parsed: dict) -> None:
             p["type"] = ptype
 
         if not isinstance(ptype, str) or ptype not in VALID_TYPES:
-            raise ValueError(
-                f"Unsupported type '{ptype}' in schema.params. "
-                f"Must be one of: {VALID_TYPES}"
-            )
+            raise ValueError(f"Unsupported type '{ptype}' in schema.params. Must be one of: {VALID_TYPES}")
 
     ret = schema.get("returns")
     if isinstance(ret, dict):
@@ -66,9 +80,7 @@ def validate_and_fix_challenge(parsed: dict) -> None:
 
     judge = schema.get("judge", "exact")
     if judge not in VALID_JUDGES and not judge.startswith("epsilon:"):
-        raise ValueError(
-            f"Invalid judge '{judge}'. Must be 'exact', 'any_order', or 'epsilon:<tol>'."
-        )
+        raise ValueError(f"Invalid judge '{judge}'. Must be 'exact', 'any_order', or 'epsilon:<tol>'.")
 
     # AUTO-FIX: Ensure test case inputs map to params properly!
     test_cases = parsed.get("test_cases", [])
@@ -85,6 +97,7 @@ def validate_and_fix_challenge(parsed: dict) -> None:
         # If the LLM provided a raw value instead of a dictionary mapping param names to values:
         if not isinstance(tc["input"], dict):
             tc["input"] = {first_param_name: tc["input"]}
+
 
 # ── Skill → coding topic mapping ──────────────────────────────────────────
 _SKILL_TO_TOPIC: dict[str, str] = {
@@ -140,17 +153,17 @@ async def challenge_agent_node(state: dict) -> dict:
         primary_lang: str = weak_skill if weak_skill in ["Python", "JavaScript", "C++"] else "Python"
 
         from services.search_service import search_service
+
         search_query = f"leetcode exact problem description constraints test cases {topic} {difficulty}"
         search_results = await search_service.search(search_query, max_results=3, search_depth="advanced")
 
         search_context = ""
         if search_results:
-            search_context = "\n\n".join(
-                f"Source: {res['url']}\nContent: {res['content']}"
-                for res in search_results
-            )
+            search_context = "\n\n".join(f"Source: {res['url']}\nContent: {res['content']}" for res in search_results)
 
-        prompt = _build_challenge_prompt(topic=topic, difficulty=difficulty, language=primary_lang, skill=weak_skill, search_context=search_context)
+        prompt = _build_challenge_prompt(
+            topic=topic, difficulty=difficulty, language=primary_lang, skill=weak_skill, search_context=search_context
+        )
 
         challenge_dict = None
         parsed: Optional[dict] = None
@@ -191,7 +204,9 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
             # Verify solution against test cases
             solutions = parsed.get("solutions", {})
             solution_raw = solutions.get("python") or parsed.get("solution", "")
-            solution_code = (solution_raw.get("python", str(solution_raw)) if isinstance(solution_raw, dict) else str(solution_raw)).replace("\\n", "\n")
+            solution_code = (
+                solution_raw.get("python", str(solution_raw)) if isinstance(solution_raw, dict) else str(solution_raw)
+            ).replace("\\n", "\n")
 
             test_cases = parsed.get("test_cases", [])
 
@@ -236,12 +251,16 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
             if cpp_sol:
                 logger.info("Verifying C++ solution in sandbox...")
                 verification_tasks.append(
-                    asyncio.to_thread(run_code, "cpp", cpp_sol, schema, parsed["test_cases"], schema.get("judge", "exact"))
+                    asyncio.to_thread(
+                        run_code, "cpp", cpp_sol, schema, parsed["test_cases"], schema.get("judge", "exact")
+                    )
                 )
             if java_sol:
                 logger.info("Verifying Java solution in sandbox...")
                 verification_tasks.append(
-                    asyncio.to_thread(run_code, "java", java_sol, schema, parsed["test_cases"], schema.get("judge", "exact"))
+                    asyncio.to_thread(
+                        run_code, "java", java_sol, schema, parsed["test_cases"], schema.get("judge", "exact")
+                    )
                 )
 
             if verification_tasks:
@@ -251,12 +270,16 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
                     cpp_eval = verification_results[task_idx]
                     task_idx += 1
                     if cpp_eval.get("status") != "AC":
-                        logger.warning(f"C++ reference verification failed! Status: {cpp_eval.get('status')}. Stderr: {cpp_eval.get('stderr')}")
+                        logger.warning(
+                            f"C++ reference verification failed! Status: {cpp_eval.get('status')}. Stderr: {cpp_eval.get('stderr')}"
+                        )
                         eval_result = cpp_eval  # Reject and trigger correction
                 if java_sol:
                     java_eval = verification_results[task_idx]
                     if java_eval.get("status") != "AC":
-                        logger.warning(f"Java reference verification failed! Status: {java_eval.get('status')}. Stderr: {java_eval.get('stderr')}")
+                        logger.warning(
+                            f"Java reference verification failed! Status: {java_eval.get('status')}. Stderr: {java_eval.get('stderr')}"
+                        )
                         eval_result = java_eval  # Reject and trigger correction
 
             if eval_result.get("status") != "AC":
@@ -265,7 +288,9 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
                     failed_cases = []
                     for r in eval_result.get("test_results", []):
                         if r.get("status") != "AC":
-                            failed_cases.append(f"Case {r.get('case')}: Expected {r.get('expected')}, but got {r.get('stdout')}")
+                            failed_cases.append(
+                                f"Case {r.get('case')}: Expected {r.get('expected')}, but got {r.get('stdout')}"
+                            )
                     err_msg = "Failed cases:\n" + "\n".join(failed_cases) if failed_cases else "Some test cases failed."
 
                 correction_prompt = f"""Your previous generated challenge failed validation or test execution!
@@ -301,7 +326,9 @@ Ensure the solution code is correct, and all test cases accurately match the exp
             break
 
         if not challenge_dict and parsed:
-            logger.error("Failed to generate a passing challenge after 4 attempts. Falling back to the last generated challenge.")
+            logger.error(
+                "Failed to generate a passing challenge after 4 attempts. Falling back to the last generated challenge."
+            )
             challenge_dict = parsed
         elif not challenge_dict:
             raise ValueError("Failed to generate a challenge after 4 attempts.")
@@ -312,7 +339,9 @@ Ensure the solution code is correct, and all test cases accurately match the exp
 
         async with async_session() as session:
             solution_val = challenge_dict.get("solution", "")
-            solution_str = (solution_val.get("python", str(solution_val)) if isinstance(solution_val, dict) else str(solution_val)).replace("\\n", "\n")
+            solution_str = (
+                solution_val.get("python", str(solution_val)) if isinstance(solution_val, dict) else str(solution_val)
+            ).replace("\\n", "\n")
 
             challenge = Challenge(
                 id=uuid.uuid4(),
@@ -327,10 +356,7 @@ Ensure the solution code is correct, and all test cases accurately match the exp
                 test_cases=challenge_dict.get("test_cases", []),
                 starter_codes=challenge_dict.get("starter_codes", {}),
                 solution=solution_str,
-                schema={
-                    **challenge_dict.get("schema", {}),
-                    "reference_solutions": challenge_dict.get("solutions", {})
-                },
+                schema={**challenge_dict.get("schema", {}), "reference_solutions": challenge_dict.get("solutions", {})},
                 judge=challenge_dict.get("schema", {}).get("judge", "exact"),
                 created_at=datetime.utcnow(),
             )
@@ -361,13 +387,13 @@ Ensure the solution code is correct, and all test cases accurately match the exp
 # ═══════════════════════════════════════════════════════════════════════════ #
 
 
-
 # ═══════════════════════════════════════════════════════════════════════════ #
 # Private helpers                                                             #
 # ═══════════════════════════════════════════════════════════════════════════ #
 
 
 _TOPIC_MEMORY: dict[str, str] = {}  # user_id -> last_topic
+
 
 def _find_weakest_coding_skill(skills: dict[str, float], last_topic: str = "") -> tuple[str, float]:
     """Return (skill_name, score) for the weakest skill, avoiding last_topic if possible."""
@@ -380,14 +406,19 @@ def _find_weakest_coding_skill(skills: dict[str, float], last_topic: str = "") -
     skill = min(coding_skills, key=coding_skills.get)  # type: ignore[arg-type]
     return skill, coding_skills[skill]
 
+
 def _difficulty_from_score(score: float) -> str:
     import random
+
     return random.choice(["medium", "hard"])
 
 
-
 def _build_challenge_prompt(topic: str, difficulty: str, language: str, skill: str, search_context: str) -> str:
-    context_block = f"\n=== INTERNET SEARCH CONTEXT ===\n{search_context}\n================================\n" if search_context else ""
+    context_block = (
+        f"\n=== INTERNET SEARCH CONTEXT ===\n{search_context}\n================================\n"
+        if search_context
+        else ""
+    )
 
     return f"""You are a senior competitive programming coach creating coding challenges.
 {context_block}
@@ -487,6 +518,7 @@ Rules:
 - The function name MUST be exactly 'solution' in all languages. For Java, it MUST be a static method inside a class named 'Solution'. For C++, it MUST be a method inside a class named 'Solution'.
 - The 'starter_codes' MUST ONLY contain the function signature and 'pass'/'return'. DO NOT include the implementation. Provide starter code for Python, C++, and Java using the exact types from your schema.
 - The 'solutions' MUST contain complete, fully-correct reference implementations in Python, C++, and Java that compile and pass all test cases!
+- CRITICAL SOLUTION CORRECTNESS RULE: Every reference solution (Python, C++, Java) MUST implement the exact same correct logic, MUST accept and correctly use EVERY parameter defined in the schema (e.g., if the schema defines parameters like `max_sales` or `max_hold`, your code must actively use them in its logic and not ignore them), and must return the correct outputs. Do NOT write solutions to simpler classic variations of the problem that ignore parameters or constraints.
 - Exactly 3 highly unique and challenging MCQs covering advanced theoretical knowledge and current trending technology concepts. These must span a broad range of subjects including Machine Learning/Deep Learning (e.g. transformers, architectures, loss functions), Distributed Systems/System Design (e.g. consensus, scaling, CAP theorem), Blockchain/Web3 (e.g. cryptography, smart contracts), Object-Oriented Programming (OOP), and advanced Programming Language Syntax/runtime internals (e.g. GIL, memory management, event loop, garbage collection). Do NOT generate basic or generic questions. The questions must test genuine, deep understanding and have extremely detailed explanation blocks.
 - All three reference solutions must be syntactically valid and pass all 6 test cases.
 """

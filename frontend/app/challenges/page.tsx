@@ -221,6 +221,14 @@ export default function ChallengesPage() {
     }
   };
 
+  const handleRequestReview = () => {
+    if (!code || !challenge) return;
+    sessionStorage.setItem("review_prefill_code", code);
+    sessionStorage.setItem("review_prefill_language", language);
+    sessionStorage.setItem("review_prefill_context", `Solution for challenge: ${challenge.title}`);
+    router.push("/review");
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -425,6 +433,15 @@ export default function ChallengesPage() {
                       {result.feedback}
                     </p>
                   </div>
+                )}
+                
+                {result.passed && (
+                  <button
+                    onClick={handleRequestReview}
+                    className="mt-4 w-full bg-[#6366f1] hover:bg-[#5558e3] text-white py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(99,102,241,0.25)] animate-bounce"
+                  >
+                    🔬 Request AI Code Review for this Solution
+                  </button>
                 )}
                 
                 {/* Step transition */}
