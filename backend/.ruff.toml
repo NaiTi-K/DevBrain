@@ -6,26 +6,6 @@ line-length = 120
 # Target Python 3.11
 target-version = "py311"
 
-# Exclude scratch, test, and debug scripts from linting
-exclude = [
-    "test_generation.py",
-    "test_api_submit.py",
-    "check_attempts_columns.py",
-    "check_db.py",
-    "clear_db.py",
-    "master_clear_db.py",
-    "test_db_submit.py",
-    "test_eval.py",
-    "test_fail.py",
-    "test_hybrid.py",
-    "test_challenge.py",
-    "temp_llm_test.py",
-    "add_col.py",
-    "add_mcq_cols.py",
-    "patch_sandbox.py",
-    "scratch_debug.py",
-    "devbrain.db",
-]
 
 [lint]
 # Enable Pyflakes (F) and pycodestyle (E, W)

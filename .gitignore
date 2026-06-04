@@ -1,5 +1,6 @@
 # Python
 venv/
+.venv/
 __pycache__/
 *.pyc
 .env
@@ -11,6 +12,12 @@ node_modules/
 
 # Data
 data/chroma/
+*.db
+
+# Debug & scratch
+*.log
+tree.txt
+.pytest_cache/
 
 # Misc
 *.egg-info/
