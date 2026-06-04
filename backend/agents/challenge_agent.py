@@ -222,11 +222,15 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
             eval_result = await asyncio.to_thread(
                 run_code, "python", solution_code, schema, test_cases, schema.get("judge", "exact")
             )
-            logger.info(f"Python eval result: status={eval_result.get('status')}, stderr={eval_result.get('stderr', '')[:200]}")
+            logger.info(
+                f"Python eval result: status={eval_result.get('status')}, stderr={eval_result.get('stderr', '')[:200]}"
+            )
             if eval_result.get("test_results"):
                 for tr in eval_result["test_results"]:
                     if tr.get("status") != "AC":
-                        logger.info(f"  Failed case {tr.get('case')}: expected={tr.get('expected')}, got={tr.get('stdout')}")
+                        logger.info(
+                            f"  Failed case {tr.get('case')}: expected={tr.get('expected')}, got={tr.get('stdout')}"
+                        )
 
             # Auto-align outputs if the sandbox test results are WA (meaning code executed successfully, but expected outputs differed)
             if eval_result.get("status") == "WA":
