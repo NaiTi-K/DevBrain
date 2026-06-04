@@ -32,7 +32,10 @@ RUN adduser --system --uid 1001 nextjs
 # Copy standalone output
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+
+# Copy public assets (may be empty)
+RUN mkdir -p /app/public
+COPY --from=builder /app/public* ./public/
 
 USER nextjs
 
