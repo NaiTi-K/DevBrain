@@ -90,6 +90,7 @@ PyGithub==2.4.0
 Pygments==2.20.0
 PyJWT==2.13.0
 PyNaCl==1.6.2
+PyPDF2==3.0.1
 PyPika==0.51.1
 pyproject_hooks==1.2.0
 pytest==8.3.3
