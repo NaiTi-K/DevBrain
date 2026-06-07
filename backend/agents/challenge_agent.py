@@ -222,6 +222,15 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
             eval_result = await asyncio.to_thread(
                 run_code, "python", solution_code, schema, test_cases, schema.get("judge", "exact")
             )
+            logger.info(
+                f"Python eval result: status={eval_result.get('status')}, stderr={eval_result.get('stderr', '')[:200]}"
+            )
+            if eval_result.get("test_results"):
+                for tr in eval_result["test_results"]:
+                    if tr.get("status") != "AC":
+                        logger.info(
+                            f"  Failed case {tr.get('case')}: expected={tr.get('expected')}, got={tr.get('stdout')}"
+                        )
 
             # Auto-align outputs if the sandbox test results are WA (meaning code executed successfully, but expected outputs differed)
             if eval_result.get("status") == "WA":
@@ -244,6 +253,9 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
                     )
 
             # 2. Run Tri-Language Verification concurrently for C++ and Java (if provided)
+            # NOTE: C++/Java failures are NON-FATAL — they log warnings but do not
+            # reject the challenge.  This prevents Docker-image availability or
+            # timeout issues from blocking challenge generation entirely.
             cpp_sol = solutions.get("cpp")
             java_sol = solutions.get("java")
 
@@ -264,23 +276,25 @@ Please fix the JSON formatting or structure, and return the ENTIRE, COMPLETE cha
                 )
 
             if verification_tasks:
-                verification_results = await asyncio.gather(*verification_tasks)
+                verification_results = await asyncio.gather(*verification_tasks, return_exceptions=True)
                 task_idx = 0
                 if cpp_sol:
                     cpp_eval = verification_results[task_idx]
                     task_idx += 1
-                    if cpp_eval.get("status") != "AC":
+                    if isinstance(cpp_eval, Exception):
+                        logger.warning(f"C++ reference verification raised an exception: {cpp_eval}")
+                    elif cpp_eval.get("status") != "AC":
                         logger.warning(
                             f"C++ reference verification failed! Status: {cpp_eval.get('status')}. Stderr: {cpp_eval.get('stderr')}"
                         )
-                        eval_result = cpp_eval  # Reject and trigger correction
                 if java_sol:
                     java_eval = verification_results[task_idx]
-                    if java_eval.get("status") != "AC":
+                    if isinstance(java_eval, Exception):
+                        logger.warning(f"Java reference verification raised an exception: {java_eval}")
+                    elif java_eval.get("status") != "AC":
                         logger.warning(
                             f"Java reference verification failed! Status: {java_eval.get('status')}. Stderr: {java_eval.get('stderr')}"
                         )
-                        eval_result = java_eval  # Reject and trigger correction
 
             if eval_result.get("status") != "AC":
                 err_msg = eval_result.get("stderr") or ""

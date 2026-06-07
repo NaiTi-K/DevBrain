@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Data
+data/
+*.db
+
+# Testing
+.pytest_cache/
+htmlcov/
+coverage.xml
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Alembic cache
+alembic/versions/__pycache__/
