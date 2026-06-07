@@ -1,171 +1,296 @@
 <div align="center">
-  <h1>🧠 DevBrain AI</h1>
-  <p><strong>Your Personal AI Senior Staff Engineer & Mentor</strong></p>
-  
-  <p>
-    <a href="#features">Features</a> •
-    <a href="#architecture">Architecture</a> •
-    <a href="#tech-stack">Tech Stack</a> •
-    <a href="#getting-started">Getting Started</a>
-  </p>
 
-  <img src="https://img.shields.io/badge/Python-3.11-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11"/>
-  <img src="https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js 14"/>
-  <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi" alt="FastAPI"/>
-  <img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
+# 🧠 DevBrain AI
+
+**AI-powered developer growth platform that actually knows your code**
+
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat&logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat&logo=next.js&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-0.2-FF6B6B?style=flat)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Sandbox-2496ED?style=flat&logo=docker&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat)
+
 </div>
 
-<br/>
+---
 
-DevBrain AI isn't just another code assistant—it's an **adaptive developer growth platform** powered by advanced autonomous agents. It connects directly to your GitHub, statistically analyzes your actual codebase history, and builds a hyper-personalized skill profile. 
+## What is DevBrain?
 
-Using multi-agent architectures (via **LangGraph**) and a secure **Polyglot Execution Sandbox**, DevBrain generates daily challenges, reviews your code with deep reasoning, and actively patches your knowledge gaps.
+DevBrain connects to your GitHub, analyzes your repositories, identifies what you're strong at and where you fall short, and then actively helps you improve. It generates coding challenges targeting your weak spots, reviews your code with the depth of a senior engineer, builds a personalized study roadmap, and runs adaptive mock interviews — all powered by a multi-agent AI system that verifies its own output before surfacing it to you.
+
+This is not a ChatGPT wrapper. The agents write solutions, execute them in an isolated sandbox, validate test cases, and only then present the challenge. Code review suggestions are syntax-checked before they reach you. Skill scoring is fully deterministic and reproducible. Everything is personalized to your actual GitHub history.
 
 ---
 
-## ✨ Features That Feel Like Magic
+## Features
 
-### 🕵️‍♂️ GitHub Skill Profiling
-Forget self-assessments. DevBrain scans your repositories, languages, and commit density to deterministically calculate your true technical proficiency across different domains. 
+### GitHub Skill Profiling
+DevBrain scans your public repositories — languages, commit patterns, repo complexity, documentation quality, CI/CD presence — and builds a scored skill profile across your entire tech stack. No self-assessment surveys, just data from your actual code.
 
-### 🤖 Agentic Self-Evaluating Challenges
-DevBrain doesn't just hallucinate coding problems. 
-1. The **Resource Agent** searches the internet (via Tavily) to source real, mathematically proven constraints from classic algorithms.
-2. The **Challenge Agent** generates a problem tailored exactly to your weakest skill.
-3. *Crucially*, before you ever see it, the agent **writes its own solution and executes it against its own test cases in a secure backend sandbox**. If its math is wrong, it fixes it autonomously. You only see 100% verified challenges.
+- Deterministic scoring via `profile_engine` — reproducible results, not LLM-generated scores that drift
+- Framework detection from dependency files (22 npm packages, 22 pip packages, and more)
+- Cyclomatic complexity analysis via Python AST
+- Results cached in Redis (24h TTL) and persisted to PostgreSQL
+- Rate limited to 5 analyses per hour per user
 
-### ⚡ Polyglot Execution Sandbox
-Whether you write your solution in **C++, Java, or Python**, DevBrain's custom backend transpiler dynamically compiles your code, injects the generated test cases, and evaluates it with sub-second latency.
+### Adaptive Coding Challenges
+DevBrain identifies your weakest skill, maps it to a relevant DSA topic, and generates a challenge. Before you see the problem, the agent completes a full self-verification loop:
 
-### 🔄 Multi-Pass AI Code Review
-Why settle for a single LLM output? When you submit code, our Code Review Agent uses a **LangGraph reflection loop**. It generates a review, scores its own review out of 1.0, and if the quality is below a strict threshold, it rewrites the review to be deeper and more actionable.
+1. Searches the web (Tavily) for real competitive programming constraints
+2. Generates solutions in Python, C++, and Java
+3. Runs its own Python solution in a Docker sandbox against its own test cases
+4. Auto-aligns expected outputs if there is a format mismatch
+5. Retries up to 4 times with error-grounded correction prompts if anything fails
+
+You only see challenges where the reference solution actually passes all test cases. Each challenge includes 3 MCQs covering ML, system design, or language internals, plus AI-generated feedback comparing your approach to the reference solution after submission.
+
+### AI Code Review
+Paste your code, select a language, and receive a structured review — line-by-line annotations, Big-O analysis, edge case detection, and concrete improvement suggestions.
+
+The review pipeline:
+1. **Pre-analysis** — AST parsing (Python) + linting for style issues and unused imports
+2. **LLM review** — structured output with scores, annotations, and improvement suggestions
+3. **Reflection loop** — the agent re-reads its own review, runs sandbox checks on each suggested improvement, and tags them `✅ VERIFIED` or `⛔ SYNTAX ERROR`
+4. **SSE streaming** — results stream to the frontend in real time
+
+Rate limited to 20 reviews per hour.
+
+### Personalized Roadmap
+Based on your GitHub analysis and a target role you select (SDE Intern, Backend, Full Stack, DevOps, ML/AI, and more), DevBrain generates a structured 6-week study plan. Topic selection and ordering are deterministic — driven by your actual skill gaps. The LLM only polishes the prose.
+
+Supports 9+ target roles. Tracks per-week completion as you progress.
+
+### Mock Interviews
+
+**DSA Mode** — Starts at Hard difficulty. Adapts based on your scores: ≥7 moves to harder questions, ≤4 drops to easier ones. 3 rounds per session, followed by a detailed scorecard.
+
+**Resume Mode** — Upload your resume (PDF), and DevBrain asks project-specific behavioral questions derived from what it extracts. 4 rounds, adaptive follow-up depth, scorecard at the end.
+
+Each answer is scored 1–10 with targeted feedback. Sessions are persisted in PostgreSQL so you can resume across browser sessions.
+
+### Resource Finder
+Search for learning resources on any topic via a RAG pipeline — ChromaDB semantic search first (all-MiniLM-L6-v2 embeddings, cosine similarity), falling back to Tavily web search. Results are ranked by source quality (official docs > GitHub repos > tutorials > general blogs) and composite relevance score. Ships with 20 curated seed resources.
+
+### Progress Analytics
+- Activity heatmap (GitHub-style, last 30 days)
+- Skill trend charts (7-day and 30-day deltas against daily snapshots)
+- Streak tracking across challenges, reviews, and interviews
+- Exam readiness scores per skill
+- Weekly digest with deterministic action items
+
+All metrics are computed from live database queries — no stale caches for analytics.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
-DevBrain is built for speed, scale, and intelligence.
-
-```mermaid
-graph TD
-    User([👨‍💻 User]) -->|Next.js 14| Frontend
-    Frontend <-->|REST / HTTPS| FastAPI[⚙️ FastAPI Backend]
-    
-    FastAPI <--> Postgres[(PostgreSQL)]
-    FastAPI <--> Redis[(Redis Cache)]
-    
-    FastAPI --> Orchestrator{LangGraph Agents}
-    
-    Orchestrator -->|Web Search| Tavily(Tavily API)
-    Orchestrator -->|LLM Reasoning| Groq(xAI Grok API)
-    
-    Orchestrator --> Sandbox[🔒 Polyglot Sandbox]
-    Sandbox -->|Subprocess Execution| Code(C++ / Java / Python)
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Next.js 14 Frontend                   │
+│  Dashboard │ Challenges │ Review │ Interview │ Roadmap   │
+└──────────────────────┬──────────────────────────────────┘
+                       │ REST + SSE
+┌──────────────────────▼──────────────────────────────────┐
+│                    FastAPI Backend                        │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │              LangGraph Orchestrator               │   │
+│  │                                                   │   │
+│  │  ┌──────────┐  ┌───────────┐  ┌───────────────┐  │   │
+│  │  │  GitHub  │  │ Challenge │  │  Code Review  │  │   │
+│  │  │ Analyzer │  │   Agent   │  │  + Reflector  │  │   │
+│  │  └──────────┘  └───────────┘  └───────────────┘  │   │
+│  │  ┌──────────┐  ┌───────────┐  ┌───────────────┐  │   │
+│  │  │  Roadmap │  │ Interview │  │   Resource    │  │   │
+│  │  │  Agent   │  │   Agent   │  │  Agent (RAG)  │  │   │
+│  │  └──────────┘  └───────────┘  └───────────────┘  │   │
+│  │  ┌──────────┐                                     │   │
+│  │  │ Progress │                                     │   │
+│  │  │  Agent   │                                     │   │
+│  │  └──────────┘                                     │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                          │
+│  ┌──────────┐  ┌─────────┐  ┌──────────┐  ┌─────────┐  │
+│  │ Groq API │  │ Tavily  │  │ ChromaDB │  │ Docker  │  │
+│  │  (LLM)   │  │(Search) │  │ (Vector) │  │Sandbox  │  │
+│  └──────────┘  └─────────┘  └──────────┘  └─────────┘  │
+└────────┬──────────────────────────────┬─────────────────┘
+         │                              │
+    ┌────▼────┐                    ┌────▼────┐
+    │PostgreSQL│                   │  Redis  │
+    │   16    │                    │    7    │
+    └─────────┘                    └─────────┘
 ```
 
-### 🧠 The Agents
-- **Challenge Agent**: Finds your weakest skill and generates/validates coding problems.
-- **Review Agent**: A cyclic reasoning loop that provides Senior-level code critiques.
-- **Roadmap Agent**: Designs a dynamic 6-week curriculum based on your GitHub gaps.
+### How the agents work
+
+The orchestrator classifies incoming intent via keyword matching and routes to the appropriate agent. Most agents follow a linear pattern: gather context → call LLM → return result.
+
+Two agents are more complex:
+
+**Challenge Agent** runs a self-verification loop. After the LLM generates a challenge, the agent executes the reference solution in a Docker sandbox, compares outputs against expected test cases, auto-corrects format mismatches, and retries up to 4 times with error-specific correction prompts before surfacing the problem.
+
+**Code Review Agent** uses a reflection loop. After generating a review, a dedicated reflector node syntax-checks and benchmarks each suggested improvement. Results below a quality threshold loop back for another review pass. Users only see suggestions tagged as verified or explicitly flagged as containing a syntax error.
 
 ---
 
-## 💻 Tech Stack
+## Tech Stack
 
 ### Backend
-- **Python 3.11 & FastAPI**: Fully asynchronous, heavily typed, blazing fast.
-- **LangGraph & xAI (Grok)**: For complex multi-agent reasoning loops.
-- **PostgreSQL & asyncpg**: Primary relational data store using JSONB and UUIDs.
-- **Redis**: Low-latency caching for skill profiles and rate-limiting.
+
+| Component | Technology | Reason |
+|-----------|------------|--------|
+| API framework | FastAPI + Uvicorn | Async-native, Pydantic validation, auto-generated docs |
+| Agent orchestration | LangGraph 0.2 | State machines with conditional edges and reflection loops |
+| LLM | Groq API — Llama 3.3 70B | 10–50x faster inference than OpenAI; falls back to Llama 3.1 8B |
+| Database | PostgreSQL 16 + asyncpg | JSONB columns, UUID PKs, async driver |
+| Caching + rate limiting | Redis 7 | Sub-millisecond cache reads, atomic INCR + EXPIRE pipelines |
+| Vector store | ChromaDB 1.5 | Embedded, no infra overhead, native sentence-transformer support |
+| Web search | Tavily | Challenge sourcing and resource fallback |
+| ORM | SQLAlchemy 2.0 | Async sessions, typed mapped columns |
+| Code sandbox | Docker | Isolated execution for Python, C++ (gcc:13), Java (eclipse-temurin:21) |
+| Embeddings | sentence-transformers | all-MiniLM-L6-v2, 384 dimensions, CPU-friendly |
+| Resume parsing | PyPDF2 | Text extraction for interview mode |
 
 ### Frontend
-- **Next.js 14 (App Router)**: React Server Components and edge-optimized routing.
-- **Tailwind CSS**: For a stunning, modern, and highly responsive UI.
-- **Monaco Editor**: Embedded VS Code-like coding experience directly in the browser.
+
+| Component | Technology | Reason |
+|-----------|------------|--------|
+| Framework | Next.js 14 (App Router) | SSR, file-based routing, modern React patterns |
+| Language | TypeScript + React 18 | Type safety across the full frontend |
+| Editor | Monaco Editor | VS Code engine in-browser — syntax highlighting, autocomplete |
+| Charts | Recharts | Radar, line, and bar charts with minimal boilerplate |
+| Styling | Tailwind CSS 3.4 | Utility-first, co-located with markup |
+| Icons | Lucide React | Consistent, lightweight icon set |
+
+### Infrastructure
+
+| Component | Technology |
+|-----------|------------|
+| Local dev | Docker Compose (PostgreSQL + Redis) |
+| CI/CD | GitHub Actions — backend tests, ruff linting, frontend build |
+| Code sandbox | Docker — python:3.12-alpine, gcc:13, eclipse-temurin:21-jdk |
 
 ---
 
-## 🚀 Getting Started
-
-Want to run DevBrain locally? It's incredibly easy to spin up.
+## Running Locally
 
 ### Prerequisites
+
 - Python 3.11+
 - Node.js 20+
-- Docker & Docker Compose
-- API Keys: xAI (Grok), GitHub OAuth, Tavily
+- Docker Desktop
+- API keys: Groq, GitHub OAuth app, Tavily
 
-### Installation (Local Hybrid Workflow)
+### 1. Clone and configure
 
-The recommended way to run DevBrain locally is a **hybrid workflow**: run the databases via Docker, but run the Backend and Frontend natively for instant hot-reloading and easier debugging.
+```bash
+git clone https://github.com/NaiTi-K/DevBrain.git
+cd DevBrain
+cp backend/.env.example backend/.env
+```
 
-1. **Clone & Configure**
-   ```bash
-   git clone https://github.com/your-username/devbrain.git
-   cd devbrain
-   
-   # Set up your environment variables
-   cp backend/.env.example backend/.env
-   # Edit .env with your API keys
-   ```
+Edit `backend/.env`:
 
-2. **Spin up Postgres & Redis**
-   ```bash
-   # Run only the database services in the background
-   docker compose up -d postgres redis
-   ```
+```env
+DATABASE_URL=postgresql+asyncpg://devbrain_user:devbrain_pass@localhost:5432/devbrain_db
+REDIS_URL=redis://localhost:6379/0
+XAI_API_KEY=your_groq_api_key
+GITHUB_CLIENT_ID=your_github_oauth_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
+TAVILY_API_KEY=your_tavily_api_key
+JWT_SECRET_KEY=pick_something_random_and_long
+FRONTEND_URL=http://localhost:3000
+```
 
-3. **Start the FastAPI Backend**
-   Open a new terminal in the `backend/` directory:
-   ```bash
-   cd backend
-   
-   # Windows
-   venv\Scripts\activate
-   # Mac/Linux
-   # source venv/bin/activate
-   
-   # Install dependencies if you haven't yet
-   pip install -r requirements.txt
-   
-   # Run the server
-   uvicorn main:app --reload --port 8000
-   ```
+Create `frontend/.env.local`:
 
-4. **Start the Next.js Frontend**
-   Open a third terminal in the `frontend/` directory:
-   ```bash
-   cd frontend
-   
-   # Install dependencies
-   npm install
-   
-   # Start the dev server
-   npm run dev
-   ```
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
-5. **Access the App**
-   - 🌐 App: `http://localhost:3000`
-   - 📖 API Docs: `http://localhost:8000/docs`
+### 2. Start the databases
+
+```bash
+docker compose up -d postgres redis
+```
+
+### 3. Pull sandbox images
+
+```bash
+docker pull python:3.12-alpine
+docker pull gcc:13
+docker pull eclipse-temurin:21-jdk
+```
+
+### 4. Start the backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+API docs at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+### 5. Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+App at [http://localhost:3000](http://localhost:3000).
+
+### 6. Seed resources (optional)
+
+```bash
+curl -X POST http://localhost:8000/resources/seed
+```
 
 ---
 
-## 🛠️ For Developers & Contributors
+## Project Scale
 
-DevBrain is built with a pristine, linted, and highly modular codebase. 
-To clear your database during rapid iteration, simply run:
-```bash
-cd backend
-python master_clear_db.py
-```
+| Metric | Count |
+|--------|-------|
+| Backend (Python) | ~15,000 lines across 30+ files |
+| Frontend (TypeScript/React) | ~5,000 lines across 15+ files |
+| Autonomous AI agents | 8 |
+| API endpoints | 24 |
+| Database models | 9 |
+| Languages supported in sandbox | 3 (Python, C++, Java) |
 
-### Future Roadmap
-- **Peer Comparison:** Anonymized skill comparison against similar-level developers.
-- **Mock Interviews:** Adaptive conversational DSA and System Design interviews.
-- **Resume Gap Analysis:** Automatically match your GitHub skill graph against job descriptions.
+---
 
-<br/>
+## Contributors
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/NaiTi-K">
+        <img src="https://github.com/NaiTi-K.png" width="80px" alt="Naitik Agrawal"/><br/>
+        <sub><b>Naitik Agrawal</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/NileshGoyal237">
+        <img src="https://github.com/NileshGoyal237.png" width="80px" alt="Nilesh Goyal"/><br/>
+        <sub><b>Nilesh Goyal</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
+
+---
 
 <div align="center">
-  <p>Built with ❤️ for developers who want to level up.</p>
+  <sub>Built with purpose. Every feature ships only after the agent verifies it works.</sub>
 </div>
